@@ -15,27 +15,16 @@ func main() {
 		log.Println("Couldn't find .env file")
 	}
 
-	res, err := OpenAI("Hello")
+	client, err := lib.NewClient("openai", os.Getenv("OPENAI_API_KEY"))
 	if err != nil {
 		panic(err)
 	}
 
-	println(res)
+	res, err := client.Send("hello")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("AI says:", res)
 	fmt.Println("Hello World")
-}
-
-func Anthropic(prompt string) (string, error) {
-	claude := lib.NewAnthropicClient(os.Getenv("ANTHROPIC_API_KEY"))
-
-	res, err := claude.Send(prompt)
-
-	return res, err
-}
-
-func OpenAI(prompt string) (string, error) {
-	opai := lib.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-
-	res, err := opai.Send(prompt)
-
-	return res, err
 }
