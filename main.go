@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/jayydoesdev/airo/bot/claude"
+	"github.com/jayydoesdev/airo/bot/lib"
 	"github.com/joho/godotenv"
 )
 
@@ -15,13 +15,27 @@ func main() {
 		log.Println("Couldn't find .env file")
 	}
 
-	claude := claude.New(os.Getenv("ANTHROPIC_API_KEY"))
-
-	res, err := claude.Send("Hello!")
+	res, err := OpenAI("Hello")
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(res)
+	println(res)
 	fmt.Println("Hello World")
+}
+
+func Anthropic(prompt string) (string, error) {
+	claude := lib.NewAnthropicClient(os.Getenv("ANTHROPIC_API_KEY"))
+
+	res, err := claude.Send(prompt)
+
+	return res, err
+}
+
+func OpenAI(prompt string) (string, error) {
+	opai := lib.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+
+	res, err := opai.Send(prompt)
+
+	return res, err
 }

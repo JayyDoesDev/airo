@@ -1,4 +1,4 @@
-package claude
+package lib
 
 import (
 	"context"
@@ -14,7 +14,7 @@ type Anthropic struct {
 	Response string
 }
 
-func New(token string) *Anthropic {
+func NewAnthropicClient(token string) *Anthropic {
 	client := anthropic.NewClient(option.WithAPIKey(token))
 
 	return &Anthropic{
