@@ -1,11 +1,14 @@
 package main
 
 import (
-	"fmt"
+	//	"fmt"
 	"log"
 	"os"
 
-	"github.com/jayydoesdev/airo/bot/lib"
+	//	"os"
+
+	//	"github.com/jayydoesdev/airo/bot/lib"
+	"github.com/jayydoesdev/airo/bot/discord"
 	"github.com/joho/godotenv"
 )
 
@@ -15,16 +18,17 @@ func main() {
 		log.Println("Couldn't find .env file")
 	}
 
-	client, err := lib.NewClient("openai", os.Getenv("OPENAI_API_KEY"))
-	if err != nil {
-		panic(err)
-	}
+	discord.StartAiro(os.Getenv("DISCORD_BOT_TOKEN"))
+	/*	client, err := lib.NewClient("openai", os.Getenv("OPENAI_API_KEY"))
+		if err != nil {
+			panic(err)
+		}
 
-	res, err := client.Send("hello")
-	if err != nil {
-		log.Fatal(err)
-	}
+		res, err := client.Send("hello")
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	fmt.Println("AI says:", res)
-	fmt.Println("Hello World")
+		fmt.Println("AI says:", res)
+		fmt.Println("Hello World") */
 }
