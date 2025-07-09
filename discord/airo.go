@@ -18,6 +18,7 @@ func StartAiro(t string) {
 
 	botevents := []interface{}{
 		events.OnReady,
+		events.OnInteractionCreate,
 	}
 
 	for _, h := range botevents {

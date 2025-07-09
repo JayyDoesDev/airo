@@ -37,6 +37,31 @@ var (
 			},
 		},
 	}
+
+	commandHandler = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+		"prompt": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			data := i.ApplicationCommandData()
+			var provider, question string
+
+			for _, option := range data.Options {
+				switch option.Name {
+				case "provider":
+					provider = option.StringValue()
+				case "question":
+					question = option.StringValue()
+				}
+			}
+
+			content := fmt.Sprintf("You chose **%s** and asked:\n> %s", provider, question)
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: content,
+				},
+			})
+		},
+	}
 )
 
 func RegisterCommands(s *discordgo.Session, guildID string) error {
@@ -48,4 +73,10 @@ func RegisterCommands(s *discordgo.Session, guildID string) error {
 		fmt.Printf("Registered command: /%s\n", cmd.Name)
 	}
 	return nil
+}
+
+func FireCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if h, ok := commandHandler[i.ApplicationCommandData().Name]; ok {
+		h(s, i)
+	}
 }
