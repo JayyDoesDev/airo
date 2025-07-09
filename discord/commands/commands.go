@@ -2,67 +2,82 @@ package commands
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/jayydoesdev/airo/bot/lib"
 )
 
-var (
-	commands = []*discordgo.ApplicationCommand{
-		{
-			Name:        "prompt",
-			Description: "Ask Airo a question!",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Name:        "provider",
-					Description: "Choose the AI provider you would like to use!",
-					Type:        discordgo.ApplicationCommandOptionString,
-					Required:    true,
-					Choices: []*discordgo.ApplicationCommandOptionChoice{
-						{
-							Name:  "OpenAI",
-							Value: "openai",
-						},
-						{
-							Name:  "Anthropic",
-							Value: "anthropic",
-						},
-					},
-				},
-				{
-					Name:        "question",
-					Description: "The prompt to ask the AI",
-					Type:        discordgo.ApplicationCommandOptionString,
-					Required:    true,
+var commands = []*discordgo.ApplicationCommand{
+	{
+		Name:        "prompt",
+		Description: "Ask Airo a question!",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "provider",
+				Description: "Choose the AI provider you would like to use!",
+				Type:        discordgo.ApplicationCommandOptionString,
+				Required:    true,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "OpenAI", Value: "openai"},
+					{Name: "Anthropic", Value: "anthropic"},
 				},
 			},
+			{
+				Name:        "question",
+				Description: "The prompt to ask the AI",
+				Type:        discordgo.ApplicationCommandOptionString,
+				Required:    true,
+			},
 		},
-	}
+	},
+}
 
-	commandHandler = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-		"prompt": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			data := i.ApplicationCommandData()
-			var provider, question string
-
-			for _, option := range data.Options {
-				switch option.Name {
-				case "provider":
-					provider = option.StringValue()
-				case "question":
-					question = option.StringValue()
-				}
+var commandHandler = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+	"prompt": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		data := i.ApplicationCommandData()
+		var provider, question string
+		for _, opt := range data.Options {
+			switch opt.Name {
+			case "provider":
+				provider = opt.StringValue()
+			case "question":
+				question = opt.StringValue()
 			}
+		}
 
-			content := fmt.Sprintf("You chose **%s** and asked:\n> %s", provider, question)
+		client, err := lib.NewClient(provider, os.Getenv("OPENAI_API_KEY"))
+		if err != nil {
+			SendAnError(s, i, fmt.Sprintf("Error initializing AI client: %v", err))
+			return
+		}
 
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: content,
-				},
-			})
+		response, err := client.Send(question)
+		if err != nil {
+			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
+			return
+		}
+
+		content := fmt.Sprintf("You chose **%s** and asked:\n> %s\n\n**Response:**\n%s", provider, question, response)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+	},
+}
+
+func SendAnError(s *discordgo.Session, i *discordgo.InteractionCreate, message string) {
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: message,
+			Flags:   discordgo.MessageFlagsEphemeral,
 		},
-	}
-)
+	})
+}
 
 func RegisterCommands(s *discordgo.Session, guildID string) error {
 	for _, cmd := range commands {
