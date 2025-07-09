@@ -6,6 +6,7 @@ import (
 
 type LibClient interface {
 	Send(prompt string) (string, error)
+	Message() string
 }
 
 func NewClient(provider string, token string) (LibClient, error) {

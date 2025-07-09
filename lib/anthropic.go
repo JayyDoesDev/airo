@@ -2,6 +2,8 @@ package lib
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -37,6 +39,17 @@ func (a *Anthropic) Send(prompt string) (string, error) {
 		MaxTokens: 1000,
 	})
 	if err != nil {
+		errMsg := err.Error()
+		const prefix = "message: "
+		idx := strings.Index(errMsg, prefix)
+		if idx != -1 {
+			msg := errMsg[idx+len(prefix):]
+			if commaIdx := strings.Index(msg, ","); commaIdx != -1 {
+				msg = msg[:commaIdx]
+			}
+			return "", errors.New(strings.TrimSpace(msg))
+		}
+
 		return "", err
 	}
 
@@ -44,4 +57,8 @@ func (a *Anthropic) Send(prompt string) (string, error) {
 	a.Response = resp.Content[0].Text
 
 	return a.Response, nil
+}
+
+func (a *Anthropic) Message() string {
+	return a.Response
 }

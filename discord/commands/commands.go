@@ -46,19 +46,19 @@ var commandHandler = map[string]func(s *discordgo.Session, i *discordgo.Interact
 			}
 		}
 
-		client, err := lib.NewClient(provider, os.Getenv("OPENAI_API_KEY"))
+		client, err := lib.NewClient(provider, os.Getenv("OPENAPI_API_KEY"))
 		if err != nil {
 			SendAnError(s, i, fmt.Sprintf("Error initializing AI client: %v", err))
 			return
 		}
 
-		response, err := client.Send(question)
+		resp, err := client.Send(question)
 		if err != nil {
 			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
 			return
 		}
 
-		content := fmt.Sprintf("You chose **%s** and asked:\n> %s\n\n**Response:**\n%s", provider, question, response)
+		content := fmt.Sprintf("You chose **%s** and asked:\n> %s\n\n**Response:**\n%s", provider, question, resp)
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
