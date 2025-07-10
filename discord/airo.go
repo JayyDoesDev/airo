@@ -11,13 +11,14 @@ import (
 
 func StartAiro(t string) {
 	discord, err := discordgo.New("Bot " + t)
-
+	discord.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions
 	if err != nil {
 		panic(err)
 	}
 
 	botevents := []interface{}{
 		events.OnReady,
+		events.OnMessageCreate,
 		events.OnInteractionCreate,
 	}
 

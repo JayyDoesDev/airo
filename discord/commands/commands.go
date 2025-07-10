@@ -52,7 +52,7 @@ var commandHandler = map[string]func(s *discordgo.Session, i *discordgo.Interact
 			return
 		}
 
-		resp, err := client.Send(question)
+		resp, err := client.Send(question, i.User.ID, i.User.Username)
 		if err != nil {
 			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
 			return

@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -22,13 +23,21 @@ func NewOpenAIClient(token string) *OpenAI {
 	}
 }
 
-func (opai *OpenAI) Send(prompt string) (string, error) {
+func (opai *OpenAI) Send(authorID string, authorUsername string, userMessage string) (string, error) {
 	ctx := context.Background()
+
+	fullPrompt := fmt.Sprintf(`User info:
+- ID: %s
+- Username: %s
+
+User said:
+%s`, authorID, authorUsername, userMessage)
 
 	resp, err := opai.Client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
-			{Role: "user", Content: prompt},
+			{Role: "system", Content: SystemPrompt},
+			{Role: "user", Content: fullPrompt},
 		},
 	})
 	if err != nil {
@@ -38,7 +47,7 @@ func (opai *OpenAI) Send(prompt string) (string, error) {
 		return "", err
 	}
 
-	opai.Prompt = prompt
+	opai.Prompt = fullPrompt
 	opai.Response = resp.Choices[0].Message.Content
 
 	return opai.Response, nil

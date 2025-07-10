@@ -10,6 +10,7 @@ dist
 temp/cache/
 latestthread.json
 latestvideo.json
+lib/prompt.go
 # User-specific files
 *.rsuser
 *.suo
