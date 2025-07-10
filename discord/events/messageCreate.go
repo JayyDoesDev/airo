@@ -50,7 +50,13 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			embed := &discordgo.MessageEmbed{
 				Title:       actionData.EmbedTitle,
 				Description: actionData.EmbedDescription,
-				Color:       0xFF69B4,
+				Thumbnail: &discordgo.MessageEmbedThumbnail{
+					URL: actionData.EmbedThumbnailUrl,
+				},
+				Image: &discordgo.MessageEmbedImage{
+					URL: actionData.EmbedImageUrl,
+				},
+				Color: 0xFF69B4,
 			}
 			msg, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 		} else {
@@ -80,15 +86,16 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		allTasks := actionData.Tasks
 		if len(allTasks) == 0 && actionData.Action != "" && actionData.TargetUser != "" {
 			allTasks = append(allTasks, lib.Action{
-				Action:           actionData.Action,
-				TargetUser:       actionData.TargetUser,
-				Reason:           actionData.Reason,
-				Role:             actionData.Role,
-				DMContent:        actionData.DMContent,
-				ResponseMsg:      actionData.ResponseMsg,
-				EmbedTitle:       actionData.EmbedTitle,
-				EmbedDescription: actionData.EmbedDescription,
-				UseEmbed:         actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed",
+				Action:            actionData.Action,
+				TargetUser:        actionData.TargetUser,
+				Reason:            actionData.Reason,
+				Role:              actionData.Role,
+				DMContent:         actionData.DMContent,
+				ResponseMsg:       actionData.ResponseMsg,
+				EmbedTitle:        actionData.EmbedTitle,
+				EmbedDescription:  actionData.EmbedDescription,
+				EmbedThumbnailUrl: actionData.EmbedThumbnailUrl,
+				UseEmbed:          actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed",
 			})
 		}
 
@@ -96,17 +103,18 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			task := t
 
 			taskqueue.BotQueue.Add(taskqueue.Task{
-				Name:             task.Action,
-				GuildID:          m.GuildID,
-				UserID:           task.TargetUser,
-				Action:           task.Action,
-				Reason:           task.Reason,
-				Role:             task.Role,
-				DMContent:        task.DMContent,
-				ResponseMsg:      task.ResponseMsg,
-				EmbedTitle:       task.EmbedTitle,
-				EmbedDescription: task.EmbedDescription,
-				UseEmbed:         task.UseEmbed,
+				Name:              task.Action,
+				GuildID:           m.GuildID,
+				UserID:            task.TargetUser,
+				Action:            task.Action,
+				Reason:            task.Reason,
+				Role:              task.Role,
+				DMContent:         task.DMContent,
+				ResponseMsg:       task.ResponseMsg,
+				EmbedTitle:        task.EmbedTitle,
+				EmbedDescription:  task.EmbedDescription,
+				EmbedThumbnailUrl: actionData.EmbedThumbnailUrl,
+				UseEmbed:          task.UseEmbed,
 				Execute: func() error {
 					switch task.Action {
 					case "kick_user":

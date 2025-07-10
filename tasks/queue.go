@@ -15,9 +15,11 @@ type Task struct {
 	DMContent   string
 	ResponseMsg string
 
-	EmbedTitle       string
-	EmbedDescription string
-	UseEmbed         bool
+	EmbedTitle        string
+	EmbedDescription  string
+	EmbedThumbnailUrl string
+	EmbedImageUrl     string
+	UseEmbed          bool
 
 	Execute func() error
 }
