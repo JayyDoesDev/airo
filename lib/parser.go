@@ -6,31 +6,41 @@ import (
 	"strings"
 )
 
-type ActionData struct {
-	Action           string `json:"action"`
-	TargetUser       string `json:"target_user,omitempty"`
-	Role             string `json:"role,omitempty"`
-	Reason           string `json:"reason,omitempty"`
-	ResponseMsg      string `json:"response"`
-	ResponseType     string `json:"response_type,omitempty"`
-	EmbedTitle       string `json:"embed_title,omitempty"`
-	EmbedDescription string `json:"embed_description,omitempty"`
-	DMContent        string `json:"dm_content,omitempty"`
+type Action struct {
+	Action      string `json:"action"`
+	TargetUser  string `json:"target_user"`
+	Reason      string `json:"reason,omitempty"`
+	Role        string `json:"role,omitempty"`
+	DMContent   string `json:"dm_content,omitempty"`
+	ResponseMsg string `json:"response,omitempty"`
 }
 
-func ParseAIResponse(resp string) (string, *ActionData, error) {
-	idx := strings.Index(resp, "{")
-	if idx == -1 {
-		return "", nil, errors.New("no JSON found in AI response")
+type ActionData struct {
+	Action           string   `json:"action"`
+	TargetUser       string   `json:"target_user"`
+	Reason           string   `json:"reason,omitempty"`
+	Role             string   `json:"role,omitempty"`
+	DMContent        string   `json:"dm_content,omitempty"`
+	ResponseMsg      string   `json:"response"`
+	ResponseType     string   `json:"response_type"`
+	EmbedTitle       string   `json:"embed_title,omitempty"`
+	EmbedDescription string   `json:"embed_description,omitempty"`
+	Tasks            []Action `json:"tasks,omitempty"`
+}
+
+func ParseAIResponse(raw string) (string, ActionData, error) {
+	jsonStart := strings.Index(raw, "{")
+	if jsonStart == -1 {
+		return "", ActionData{}, errors.New("no JSON found in response")
 	}
 
-	natural := strings.TrimSpace(resp[:idx])
-	jsonPart := strings.TrimSpace(resp[idx:])
+	natural := strings.TrimSpace(raw[:jsonStart])
+	jsonPart := strings.TrimSpace(raw[jsonStart:])
 
 	var data ActionData
 	if err := json.Unmarshal([]byte(jsonPart), &data); err != nil {
-		return "", nil, err
+		return "", ActionData{}, err
 	}
 
-	return natural, &data, nil
+	return natural, data, nil
 }
