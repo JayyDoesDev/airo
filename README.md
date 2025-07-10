@@ -1,5 +1,5 @@
-<p align="center"><img src="https://github.com/your-username/airo/blob/main/.github/assets/aira.png?raw=true" alt="airo" width="500"/></p>
-<h1 align="center">Airo</h1>
+<p align="center"><img src="https://github.com/your-username/airo/blob/main/.github/assets/aira.png?raw=true" alt="aira" width="500"/></p>
+<h1 align="center">Aira</h1>
 <h2 align="center">💬✨ Your sassy AI sidekick — powered by DiscordGo + Claude or GPT</h2>
 
 <div>
