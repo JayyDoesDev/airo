@@ -1,4 +1,4 @@
-<p align="center"><img src="https://github.com/your-username/airo/blob/main/.github/assets/aira.png?raw=true" alt="aira" width="500"/></p>
+<p align="center"><img src="https://github.com/JayyDoesDev/airo/blob/main/.github/assets/aira.png" alt="aira" width="400"/></p>
 <h1 align="center">Aira</h1>
 <h2 align="center">💬✨ Your sassy AI sidekick — powered by DiscordGo + Claude or GPT</h2>
 
