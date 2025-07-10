@@ -115,10 +115,14 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				EmbedDescription:  task.EmbedDescription,
 				EmbedThumbnailUrl: actionData.EmbedThumbnailUrl,
 				UseEmbed:          task.UseEmbed,
-				Execute: func() error {
-					return lib.HandleActions(task, s, m)
-				},
+				Execute:           MakeExecute(task, s, m),
 			})
 		}
+	}
+}
+
+func MakeExecute(task lib.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {
+	return func() error {
+		return lib.HandleActions(task, s, m)
 	}
 }

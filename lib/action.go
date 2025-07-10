@@ -76,10 +76,10 @@ func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate
 		} else {
 			if task.ResponseMsg != "" {
 				s.ChannelMessageSend(m.ChannelID, task.ResponseMsg)
-			} else {
-				s.ChannelMessageSend(m.ChannelID, roleList)
 			}
+			s.ChannelMessageSend(m.ChannelID, roleList)
 		}
+
 		return nil
 
 	default:
