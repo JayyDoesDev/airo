@@ -7,12 +7,15 @@ import (
 )
 
 type ActionData struct {
-	Action      string `json:"action"`
-	TargetUser  string `json:"target_user,omitempty"`
-	Role        string `json:"role,omitempty"`
-	Reason      string `json:"reason,omitempty"`
-	ResponseMsg string `json:"response"`
-	DMContent   string `json:"dm_content,omitempty"`
+	Action           string `json:"action"`
+	TargetUser       string `json:"target_user,omitempty"`
+	Role             string `json:"role,omitempty"`
+	Reason           string `json:"reason,omitempty"`
+	ResponseMsg      string `json:"response"`
+	ResponseType     string `json:"response_type,omitempty"`
+	EmbedTitle       string `json:"embed_title,omitempty"`
+	EmbedDescription string `json:"embed_description,omitempty"`
+	DMContent        string `json:"dm_content,omitempty"`
 }
 
 func ParseAIResponse(resp string) (string, *ActionData, error) {
