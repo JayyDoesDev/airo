@@ -14,7 +14,12 @@ type Task struct {
 	Role        string
 	DMContent   string
 	ResponseMsg string
-	Execute     func() error
+
+	EmbedTitle       string
+	EmbedDescription string
+	UseEmbed         bool
+
+	Execute func() error
 }
 
 type Queue struct {
