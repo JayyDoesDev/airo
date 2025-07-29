@@ -21,6 +21,10 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	mention2 := "<@!" + botID + ">"
 
 	if strings.HasPrefix(m.Content, mention1) || strings.HasPrefix(m.Content, mention2) {
+		err := s.ChannelTyping(m.ChannelID)
+		if err != nil {
+			return
+		}
 		client, err := lib.NewClient("anthropic", os.Getenv("OPENAPI_API_KEY"))
 		if err != nil {
 			panic(err)
