@@ -19,6 +19,7 @@
 - 🖼️ **Embeds** – Sends beautiful responses with titles, thumbnails, and images
 - 🔀 **Queue System** – Executes all tasks asynchronously and in order
 - 🤖 **Zero Slash Needed** – Just mention the bot and it does the rest
+- 📝 **Memory** - Can remember things and will create memories it thinks it will need. (binary based)
 
 ---
 
