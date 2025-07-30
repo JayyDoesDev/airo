@@ -5,7 +5,7 @@ import (
 )
 
 type LibClient interface {
-	Send(authorID string, authorUsername string, userMessage string) (string, error)
+	Send(authorID string, authorUsername string, userMessage string, mem Memory) (string, error)
 	Message() string
 }
 

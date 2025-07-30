@@ -51,8 +51,12 @@ var commandHandler = map[string]func(s *discordgo.Session, i *discordgo.Interact
 			SendAnError(s, i, fmt.Sprintf("Error initializing AI client: %v", err))
 			return
 		}
-
-		resp, err := client.Send(question, i.User.ID, i.User.Username)
+		mem, err := lib.GetMemory()
+		if err != nil {
+			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
+			return
+		}
+		resp, err := client.Send(question, i.User.ID, i.User.Username, mem)
 		if err != nil {
 			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
 			return

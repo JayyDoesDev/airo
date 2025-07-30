@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,8 +32,11 @@ func (a *Anthropic) SetToken(t string) {
 	a.Client = anthropic.NewClient(option.WithAPIKey(t))
 }
 
-func (a *Anthropic) Send(authorID, authorUsername, userMessage string) (string, error) {
+func (a *Anthropic) Send(authorID, authorUsername, userMessage string, mem Memory) (string, error) {
 	ctx := context.Background()
+
+	memJSON, _ := json.MarshalIndent(mem, "", "  ")
+
 	fullPrompt := fmt.Sprintf(`%s
 
 User info:
@@ -41,7 +45,9 @@ User info:
 
 User message:
 %s
-`, SystemPrompt, authorID, authorUsername, userMessage)
+
+Your Memory: %s
+`, SystemPrompt, authorID, authorUsername, userMessage, string(memJSON))
 
 	resp, err := a.Client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model: anthropic.ModelClaudeSonnet4_0,

@@ -22,19 +22,20 @@ type Action struct {
 }
 
 type ActionData struct {
-	Action            string   `json:"action"`
-	TargetUser        string   `json:"target_user"`
-	Reason            string   `json:"reason,omitempty"`
-	Role              string   `json:"role,omitempty"`
-	DMContent         string   `json:"dm_content,omitempty"`
-	ResponseMsg       string   `json:"response"`
-	ResponseType      string   `json:"response_type"`
-	EmbedTitle        string   `json:"embed_title,omitempty"`
-	EmbedDescription  string   `json:"embed_description,omitempty"`
-	EmbedThumbnailUrl string   `json:"embed_thumbnail_url,omitempty"`
-	EmbedImageUrl     string   `json:"embed_image_url,omitempty"`
-	UseEmbed          bool     `json:"use_embed,omitempty"`
-	Tasks             []Action `json:"tasks,omitempty"`
+	Action            string       `json:"action"`
+	TargetUser        string       `json:"target_user"`
+	Reason            string       `json:"reason,omitempty"`
+	Role              string       `json:"role,omitempty"`
+	DMContent         string       `json:"dm_content,omitempty"`
+	ResponseMsg       string       `json:"response"`
+	ResponseType      string       `json:"response_type"`
+	EmbedTitle        string       `json:"embed_title,omitempty"`
+	EmbedDescription  string       `json:"embed_description,omitempty"`
+	EmbedThumbnailUrl string       `json:"embed_thumbnail_url,omitempty"`
+	EmbedImageUrl     string       `json:"embed_image_url,omitempty"`
+	UseEmbed          bool         `json:"use_embed,omitempty"`
+	Tasks             []Action     `json:"tasks,omitempty"`
+	Memories          []MemoryItem `json:"memories,omitempty"`
 }
 
 func ParseAIResponse(raw string) (string, ActionData, error) {

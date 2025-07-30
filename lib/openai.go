@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -23,15 +24,20 @@ func NewOpenAIClient(token string) *OpenAI {
 	}
 }
 
-func (opai *OpenAI) Send(authorID string, authorUsername string, userMessage string) (string, error) {
+func (opai *OpenAI) Send(authorID string, authorUsername string, userMessage string, mem Memory) (string, error) {
 	ctx := context.Background()
+
+	memJSON, _ := json.MarshalIndent(mem, "", "  ")
 
 	fullPrompt := fmt.Sprintf(`User info:
 - ID: %s
 - Username: %s
 
 User said:
-%s`, authorID, authorUsername, userMessage)
+%s
+
+Your Memory:
+%s`, authorID, authorUsername, userMessage, string(memJSON))
 
 	resp, err := opai.Client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,

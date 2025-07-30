@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jayydoesdev/airo/bot/lib"
@@ -31,8 +32,20 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		content := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(m.Content, mention1), mention2))
+		mem, err := lib.GetMemory()
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
+			return
+		}
+		memoriesText, err := lib.GetSummarizedMemory(m.Author.ID, "")
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Error loading memories: "+err.Error())
+			return
+		}
 
-		resp, err := client.Send(m.Author.ID, m.Author.Username, content)
+		fullPrompt := memoriesText + "\nUser says: " + content
+		resp, err := client.Send(m.Author.ID, m.Author.Username, fullPrompt, mem)
+
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
 			return
@@ -50,6 +63,26 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		var msg *discordgo.Message
+		if len(actionData.Memories) > 0 {
+			for _, mem := range actionData.Memories {
+				lib.CreateMemory(lib.MemoryItem{
+					Id:           lib.GenerateID(),
+					Title:        mem.Title,
+					Content:      mem.Content,
+					Type:         mem.Type,
+					Source:       mem.Source,
+					Importance:   mem.Importance,
+					Created:      time.Now().Format(time.RFC3339),
+					Lastaccessed: time.Now().Format(time.RFC3339),
+					Related:      mem.Related,
+					Context: &lib.MemoryItemContext{
+						Location: mem.Context.Location,
+						Author:   m.Author.ID,
+					},
+				})
+			}
+		}
+
 		if actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed" {
 			embed := &discordgo.MessageEmbed{
 				Title:       actionData.EmbedTitle,
