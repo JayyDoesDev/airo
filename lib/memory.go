@@ -119,6 +119,10 @@ func StoreToMemory(item MemoryItem) error {
 		return err
 	}
 
+	if item.Importance >= 0.5 {
+		mem.Meta.PriorityQueue = append(mem.Meta.PriorityQueue, item.Id)
+	}
+
 	if item.Importance >= 0.7 {
 		mem.LongTerm = append(mem.LongTerm, item)
 	} else {

@@ -26,6 +26,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if err != nil {
 			return
 		}
+
 		client, err := lib.NewClient("anthropic", os.Getenv("OPENAPI_API_KEY"))
 		if err != nil {
 			panic(err)
@@ -37,15 +38,18 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
 			return
 		}
-		memoriesText, err := lib.GetSummarizedMemory(m.Author.ID, "")
-		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Error loading memories: "+err.Error())
-			return
+
+		promptMem := "Here are your memories:\n"
+		for _, item := range mem.ShortTerm {
+			promptMem += fmt.Sprintf("- [Short] %s: %s\n", item.Title, item.Content)
+		}
+		for _, item := range mem.LongTerm {
+			promptMem += fmt.Sprintf("- [Long] %s: %s\n", item.Title, item.Content)
 		}
 
-		fullPrompt := memoriesText + "\nUser says: " + content
-		resp, err := client.Send(m.Author.ID, m.Author.Username, fullPrompt, mem)
+		fullPrompt := promptMem + "\nUser says: " + content
 
+		resp, err := client.Send(m.Author.ID, m.Author.Username, fullPrompt, mem)
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
 			return
