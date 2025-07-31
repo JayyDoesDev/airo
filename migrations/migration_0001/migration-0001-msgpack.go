@@ -1,4 +1,4 @@
-package main
+package migration_0001
 
 import (
 	"encoding/json"
@@ -31,19 +31,4 @@ func Migrate() (bool, error) {
 	}
 
 	return true, nil
-}
-
-func main() {
-	go func() {
-		success, err := Migrate()
-		if err != nil {
-			fmt.Println("Migration failed:", err)
-			return
-		}
-		if success {
-			fmt.Println("Migration successful")
-		}
-	}()
-
-	select {}
 }

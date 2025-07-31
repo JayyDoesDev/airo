@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jayydoesdev/airo/bot/cryptography"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -81,8 +82,13 @@ func GetMemory(file string) (Memory, error) {
 	if len(data) == 0 {
 		return memory, nil
 	}
+	key := cryptography.GetAESKey()
+	decrypted, err := cryptography.Decrypt(data, key)
+	if err != nil {
+		return Memory{}, fmt.Errorf("failed to decrypt memory: %w", err)
+	}
 
-	if err := msgpack.Unmarshal(data, &memory); err != nil {
+	if err := msgpack.Unmarshal(decrypted, &memory); err != nil {
 		return memory, fmt.Errorf("failed to parse memory: %w", err)
 	}
 
@@ -98,8 +104,13 @@ func SaveMemoryToFile(filename string, mem Memory) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal memory: %w", err)
 	}
+	key := cryptography.GetAESKey()
+	encrypted, err := cryptography.Encrypt(data, key)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt memory: %w", err)
+	}
 
-	if err := os.WriteFile(filename, data, 0644); err != nil {
+	if err := os.WriteFile(filename, encrypted, 0644); err != nil {
 		return fmt.Errorf("failed to write memory: %w", err)
 	}
 
