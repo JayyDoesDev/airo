@@ -52,18 +52,8 @@ type MemoryMeta struct {
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func CreateMemory(newItem MemoryItem) {
-	memory, err := GetMemory("memory.msgpack")
-	if err != nil {
-		fmt.Printf("Failed to read memory file: %v\n", err)
-		return
-	}
 
-	memory.ShortTerm = append(memory.ShortTerm, newItem)
-
-	if err := SaveMemoryToFile("memory.msgpack", memory); err != nil {
-		fmt.Printf("Failed to write memory file: %v\n", err)
-		return
-	}
+	StoreToMemory(newItem)
 
 	fmt.Println("Memory item appended successfully.")
 }
@@ -76,6 +66,7 @@ func GetMemory(file string) (Memory, error) {
 		if os.IsNotExist(err) {
 			return memory, nil
 		}
+
 		return memory, fmt.Errorf("failed to read memory: %w", err)
 	}
 

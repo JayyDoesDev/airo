@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -24,20 +26,41 @@ func NewOpenAIClient(token string) *OpenAI {
 	}
 }
 
-func (opai *OpenAI) Send(authorID string, authorUsername string, userMessage string, mem Memory) (string, error) {
+func (opai *OpenAI) Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")
 
-	fullPrompt := fmt.Sprintf(`User info:
-- ID: %s
+	var roleNames []string
+	for _, role := range serverInfo.Roles {
+		roleNames = append(roleNames, role.Name)
+	}
+	rolesFormatted := "None"
+	if len(roleNames) > 0 {
+		rolesFormatted = strings.Join(roleNames, ", ")
+	}
+
+	serverDescription := fmt.Sprintf(`- Server Name: %s
+- Server ID: %s
+- Member Count: %d
+- Owner ID: %s
+- NSFW Level: %v
+- Roles: %s`, serverInfo.Name, serverInfo.ID, serverInfo.MemberCount, serverInfo.OwnerID, serverInfo.NSFWLevel, rolesFormatted)
+
+	fullPrompt := fmt.Sprintf(`%s
+
+User info:
+- Discord User ID: %s
 - Username: %s
 
-User said:
+Server Info:
 %s
 
-Your Memory:
-%s`, authorID, authorUsername, userMessage, string(memJSON))
+User message:
+%s
+
+Your Memory: %s
+`, SystemPrompt, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	resp, err := opai.Client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,

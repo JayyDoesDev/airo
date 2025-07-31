@@ -49,7 +49,12 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		fullPrompt := promptMem + "\nUser says: " + content
 
-		resp, err := client.Send(m.Author.ID, m.Author.Username, fullPrompt, mem)
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
+			return
+		}
+		resp, err := client.Send(m.Author.ID, m.Author.Username, *guild, fullPrompt, mem)
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
 			return

@@ -9,6 +9,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/bwmarrin/discordgo"
 )
 
 type Anthropic struct {
@@ -32,10 +33,26 @@ func (a *Anthropic) SetToken(t string) {
 	a.Client = anthropic.NewClient(option.WithAPIKey(t))
 }
 
-func (a *Anthropic) Send(authorID, authorUsername, userMessage string, mem Memory) (string, error) {
+func (a *Anthropic) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")
+
+	var roleNames []string
+	for _, role := range serverInfo.Roles {
+		roleNames = append(roleNames, role.Name)
+	}
+	rolesFormatted := "None"
+	if len(roleNames) > 0 {
+		rolesFormatted = strings.Join(roleNames, ", ")
+	}
+
+	serverDescription := fmt.Sprintf(`- Server Name: %s
+- Server ID: %s
+- Member Count: %d
+- Owner ID: %s
+- NSFW Level: %v
+- Roles: %s`, serverInfo.Name, serverInfo.ID, serverInfo.MemberCount, serverInfo.OwnerID, serverInfo.NSFWLevel, rolesFormatted)
 
 	fullPrompt := fmt.Sprintf(`%s
 
@@ -43,11 +60,14 @@ User info:
 - Discord User ID: %s
 - Username: %s
 
+Server Info:
+%s
+
 User message:
 %s
 
 Your Memory: %s
-`, SystemPrompt, authorID, authorUsername, userMessage, string(memJSON))
+`, SystemPrompt, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	resp, err := a.Client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model: anthropic.ModelClaudeSonnet4_0,
@@ -72,7 +92,6 @@ Your Memory: %s
 			}
 			return "", errors.New(strings.TrimSpace(msg))
 		}
-
 		return "", err
 	}
 

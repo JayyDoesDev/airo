@@ -56,7 +56,23 @@ var commandHandler = map[string]func(s *discordgo.Session, i *discordgo.Interact
 			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
 			return
 		}
-		resp, err := client.Send(question, i.User.ID, i.User.Username, mem)
+
+		promptMem := "Here are your memories:\n"
+		for _, item := range mem.ShortTerm {
+			promptMem += fmt.Sprintf("- [Short] %s: %s\n", item.Title, item.Content)
+		}
+		for _, item := range mem.LongTerm {
+			promptMem += fmt.Sprintf("- [Long] %s: %s\n", item.Title, item.Content)
+		}
+
+		fullPrompt := promptMem + "\nUser says: " + question
+
+		guild, err := s.Guild(i.GuildID)
+		if err != nil {
+			SendAnError(s, i, "Error: "+err.Error())
+			return
+		}
+		resp, err := client.Send(i.Member.User.ID, i.Member.User.Username, *guild, fullPrompt, mem)
 		if err != nil {
 			SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
 			return

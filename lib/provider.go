@@ -2,10 +2,12 @@ package lib
 
 import (
 	"errors"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 type LibClient interface {
-	Send(authorID string, authorUsername string, userMessage string, mem Memory) (string, error)
+	Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error)
 	Message() string
 }
 
