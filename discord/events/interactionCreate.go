@@ -6,5 +6,5 @@ import (
 )
 
 func OnInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	commands.FireCommands(s, i)
+	commands.TriggerCommands(s, i)
 }
