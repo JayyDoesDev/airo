@@ -61,6 +61,8 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		naturalMsg, actionData, err := lib.ParseAIResponse(resp)
+		actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@everyone", "everyone")
+		actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@here", "here")
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error parsing AI response: "+err.Error())
 			return

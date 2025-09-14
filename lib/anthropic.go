@@ -79,7 +79,7 @@ Your Memory: %s
 				},
 			},
 		},
-		MaxTokens: 1000,
+		MaxTokens: 3000,
 	})
 	if err != nil {
 		errMsg := err.Error()
