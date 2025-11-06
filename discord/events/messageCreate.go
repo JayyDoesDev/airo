@@ -61,7 +61,9 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 
-		if strings.HasPrefix(resp, "SEARCH(") {
+		isGoogleSearch := strings.Contains(resp, `SEARCH("`)
+
+		if isGoogleSearch {
 			limit, _ := strconv.Atoi(os.Getenv("GOOGLE_RESULT_LIMIT"))
 
 			google := lib.GoogelClient(lib.Google{
@@ -157,16 +159,35 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		if actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed" {
-			embed := &discordgo.MessageEmbed{
-				Title:       actionData.EmbedTitle,
-				Description: actionData.EmbedDescription,
-				Thumbnail: &discordgo.MessageEmbedThumbnail{
-					URL: actionData.EmbedThumbnailUrl,
-				},
-				Image: &discordgo.MessageEmbedImage{
-					URL: actionData.EmbedImageUrl,
-				},
-				Color: 0xFF69B4,
+			var embed *discordgo.MessageEmbed
+			if isGoogleSearch {
+				embed = &discordgo.MessageEmbed{
+					Title:       actionData.EmbedTitle,
+					Description: actionData.EmbedDescription,
+					Thumbnail: &discordgo.MessageEmbedThumbnail{
+						URL: actionData.EmbedThumbnailUrl,
+					},
+					Image: &discordgo.MessageEmbedImage{
+						URL: actionData.EmbedImageUrl,
+					},
+					Footer: &discordgo.MessageEmbedFooter{
+						Text:    "Results provided by Google",
+						IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
+					},
+					Color: 0x4285F,
+				}
+			} else {
+				embed = &discordgo.MessageEmbed{
+					Title:       actionData.EmbedTitle,
+					Description: actionData.EmbedDescription,
+					Thumbnail: &discordgo.MessageEmbedThumbnail{
+						URL: actionData.EmbedThumbnailUrl,
+					},
+					Image: &discordgo.MessageEmbedImage{
+						URL: actionData.EmbedImageUrl,
+					},
+					Color: 0xFF69B4,
+				}
 			}
 			msg, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 		} else {
@@ -179,9 +200,21 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		if !actionData.UseEmbed && strings.ToLower(actionData.ResponseType) != "embed" {
-			embed := &discordgo.MessageEmbed{
-				Description: naturalMsg,
-				Color:       0xFF69B4,
+			var embed *discordgo.MessageEmbed
+			if isGoogleSearch {
+				embed = &discordgo.MessageEmbed{
+					Description: naturalMsg,
+					Color:       0x4285F4,
+					Footer: &discordgo.MessageEmbedFooter{
+						Text:    "Results provided by Google",
+						IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
+					},
+				}
+			} else {
+				embed = &discordgo.MessageEmbed{
+					Description: naturalMsg,
+					Color:       0xFF69B4,
+				}
 			}
 			_, err = s.ChannelMessageEditComplex(&discordgo.MessageEdit{
 				Channel: m.ChannelID,
@@ -231,7 +264,6 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-// unchanged
 func MakeExecute(task lib.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {
 	return func() error {
 		return lib.HandleActions(task, s, m)
