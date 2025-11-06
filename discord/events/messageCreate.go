@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,7 +61,68 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 
+		if strings.HasPrefix(resp, "SEARCH(") {
+			limit, _ := strconv.Atoi(os.Getenv("GOOGLE_RESULT_LIMIT"))
+
+			google := lib.GoogelClient(lib.Google{
+				APIKey:     os.Getenv("GOOGLE_API_KEY"),
+				CXEngineID: os.Getenv("GOOGLE_CX_ENGINE_ID"),
+				Limit:      limit,
+			})
+
+			start := strings.Index(resp, "SEARCH(\"")
+			resp = resp[start:]
+			q := strings.TrimSuffix(strings.TrimPrefix(resp, `SEARCH("`), `")`)
+
+			results, err := google.Search(q)
+
+			items := google.LimitItems(results.Items)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Search failed: "+err.Error())
+				return
+			}
+
+			var sb strings.Builder
+			sb.WriteString(lib.SecondPromptTitle)
+			for i, item := range items {
+				sb.WriteString(fmt.Sprintf("[%d] %s\n%s\n\n", i+1, item.Title, item.Link, item.Snippet))
+			}
+
+			if len(items) == 0 {
+				resp, err = client.Send(
+					m.Author.ID, m.Author.Username, *guild,
+					fullPrompt+lib.SecondPromptResultsNotFound,
+					mem,
+				)
+				if err != nil {
+					s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
+					return
+				}
+			} else {
+				secondPrompt := strings.Builder{}
+				secondPrompt.WriteString(lib.SecondPromptHeader)
+				secondPrompt.WriteString(sb.String())
+				secondPrompt.WriteString(lib.SecondPromptRules)
+
+				emptyMem := lib.Memory{ShortTerm: nil, LongTerm: nil}
+
+				resp, err = client.Send(
+					m.Author.ID, m.Author.Username, *guild,
+					secondPrompt.String(),
+					emptyMem,
+				)
+				if err != nil {
+					s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
+					return
+				}
+			}
+		}
+
+		fmt.Println("RAW RESPONSE:")
+		fmt.Println(resp)
+
 		naturalMsg, actionData, err := lib.ParseAIResponse(resp)
+
 		actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@everyone", "everyone")
 		actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@here", "here")
 		if err != nil {
@@ -169,6 +231,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+// unchanged
 func MakeExecute(task lib.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {
 	return func() error {
 		return lib.HandleActions(task, s, m)
