@@ -13,14 +13,112 @@ import (
 	taskqueue "github.com/jayydoesdev/airo/bot/tasks"
 )
 
+func HandleMentions(Id string) (string, string) {
+	return "<@" + Id + ">", "<@!" + Id + ">"
+}
+
+func HandleGoogleSearch(resp string, client lib.LibClient, fullPrompt string, mem lib.Memory, s *discordgo.Session, m *discordgo.MessageCreate, guild *discordgo.Guild) (string, bool) {
+	isGoogleSearch := strings.Contains(resp, `SEARCH("`)
+	if !isGoogleSearch {
+		return resp, false
+	}
+
+	limit, _ := strconv.Atoi(os.Getenv("GOOGLE_RESULT_LIMIT"))
+	google := lib.GoogelClient(lib.Google{
+		APIKey:     os.Getenv("GOOGLE_API_KEY"),
+		CXEngineID: os.Getenv("GOOGLE_CX_ENGINE_ID"),
+		Limit:      limit,
+	})
+
+	start := strings.Index(resp, "SEARCH(\"")
+	resp = resp[start:]
+	q := strings.TrimSuffix(strings.TrimPrefix(resp, `SEARCH("`), `")`)
+
+	results, err := google.Search(q)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Search failed: "+err.Error())
+		return resp, true
+	}
+
+	items := google.LimitItems(results.Items)
+	var newResp string
+
+	if len(items) == 0 {
+		newResp, err = client.Send(
+			m.Author.ID, m.Author.Username, *guild,
+			fullPrompt+lib.SecondPromptResultsNotFound,
+			mem,
+		)
+	} else {
+		var sb strings.Builder
+		sb.WriteString(lib.SecondPromptTitle)
+		for i, item := range items {
+			sb.WriteString(fmt.Sprintf("[%d] %s\n%s\n\n", i+1, item.Title, item.Link, item.Snippet))
+		}
+
+		secondPrompt := strings.Builder{}
+		secondPrompt.WriteString(lib.SecondPromptHeader)
+		secondPrompt.WriteString(sb.String())
+		secondPrompt.WriteString(lib.SecondPromptRules)
+
+		newResp, err = client.Send(
+			m.Author.ID, m.Author.Username, *guild,
+			secondPrompt.String(),
+			lib.Memory{ShortTerm: nil, LongTerm: nil},
+		)
+	}
+
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
+		return resp, true
+	}
+
+	return newResp, true
+}
+
+type GoogleEmbedOptions struct {
+	Title     string
+	Thumbnail string
+	Image     string
+	Color     int
+}
+
+func GoogleEmbed(description string, opts *GoogleEmbedOptions) *discordgo.MessageEmbed {
+	color := 0x4285F4
+	if opts != nil && opts.Color != 0 {
+		color = opts.Color
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Description: description,
+		Color:       color,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text:    "Results provided by Google",
+			IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
+		},
+	}
+
+	if opts != nil {
+		if opts.Title != "" {
+			embed.Title = opts.Title
+		}
+		if opts.Thumbnail != "" {
+			embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: opts.Thumbnail}
+		}
+		if opts.Image != "" {
+			embed.Image = &discordgo.MessageEmbedImage{URL: opts.Image}
+		}
+	}
+
+	return embed
+}
+
 func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
 	}
 
-	botID := s.State.User.ID
-	mention1 := "<@" + botID + ">"
-	mention2 := "<@!" + botID + ">"
+	mention1, mention2 := HandleMentions(s.State.User.ID)
 
 	if strings.HasPrefix(m.Content, mention1) || strings.HasPrefix(m.Content, mention2) {
 		err := s.ChannelTyping(m.ChannelID)
@@ -62,63 +160,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		isGoogleSearch := strings.Contains(resp, `SEARCH("`)
-
-		if isGoogleSearch {
-			limit, _ := strconv.Atoi(os.Getenv("GOOGLE_RESULT_LIMIT"))
-
-			google := lib.GoogelClient(lib.Google{
-				APIKey:     os.Getenv("GOOGLE_API_KEY"),
-				CXEngineID: os.Getenv("GOOGLE_CX_ENGINE_ID"),
-				Limit:      limit,
-			})
-
-			start := strings.Index(resp, "SEARCH(\"")
-			resp = resp[start:]
-			q := strings.TrimSuffix(strings.TrimPrefix(resp, `SEARCH("`), `")`)
-
-			results, err := google.Search(q)
-
-			items := google.LimitItems(results.Items)
-			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, "Search failed: "+err.Error())
-				return
-			}
-
-			var sb strings.Builder
-			sb.WriteString(lib.SecondPromptTitle)
-			for i, item := range items {
-				sb.WriteString(fmt.Sprintf("[%d] %s\n%s\n\n", i+1, item.Title, item.Link, item.Snippet))
-			}
-
-			if len(items) == 0 {
-				resp, err = client.Send(
-					m.Author.ID, m.Author.Username, *guild,
-					fullPrompt+lib.SecondPromptResultsNotFound,
-					mem,
-				)
-				if err != nil {
-					s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
-					return
-				}
-			} else {
-				secondPrompt := strings.Builder{}
-				secondPrompt.WriteString(lib.SecondPromptHeader)
-				secondPrompt.WriteString(sb.String())
-				secondPrompt.WriteString(lib.SecondPromptRules)
-
-				emptyMem := lib.Memory{ShortTerm: nil, LongTerm: nil}
-
-				resp, err = client.Send(
-					m.Author.ID, m.Author.Username, *guild,
-					secondPrompt.String(),
-					emptyMem,
-				)
-				if err != nil {
-					s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
-					return
-				}
-			}
-		}
+		resp, _ = HandleGoogleSearch(resp, client, fullPrompt, mem, s, m, guild)
 
 		fmt.Println("RAW RESPONSE:")
 		fmt.Println(resp)
@@ -161,21 +203,11 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed" {
 			var embed *discordgo.MessageEmbed
 			if isGoogleSearch {
-				embed = &discordgo.MessageEmbed{
-					Title:       actionData.EmbedTitle,
-					Description: actionData.EmbedDescription,
-					Thumbnail: &discordgo.MessageEmbedThumbnail{
-						URL: actionData.EmbedThumbnailUrl,
-					},
-					Image: &discordgo.MessageEmbedImage{
-						URL: actionData.EmbedImageUrl,
-					},
-					Footer: &discordgo.MessageEmbedFooter{
-						Text:    "Results provided by Google",
-						IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
-					},
-					Color: 0x4285F,
-				}
+				embed = GoogleEmbed(actionData.EmbedDescription, &GoogleEmbedOptions{
+					Title:     actionData.EmbedTitle,
+					Thumbnail: actionData.EmbedThumbnailUrl,
+					Image:     actionData.EmbedImageUrl,
+				})
 			} else {
 				embed = &discordgo.MessageEmbed{
 					Title:       actionData.EmbedTitle,
@@ -202,14 +234,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if !actionData.UseEmbed && strings.ToLower(actionData.ResponseType) != "embed" {
 			var embed *discordgo.MessageEmbed
 			if isGoogleSearch {
-				embed = &discordgo.MessageEmbed{
-					Description: naturalMsg,
-					Color:       0x4285F4,
-					Footer: &discordgo.MessageEmbedFooter{
-						Text:    "Results provided by Google",
-						IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
-					},
-				}
+				embed = GoogleEmbed(naturalMsg, &GoogleEmbedOptions{})
 			} else {
 				embed = &discordgo.MessageEmbed{
 					Description: naturalMsg,
