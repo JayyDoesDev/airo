@@ -198,3 +198,49 @@ func GetSummarizedMemory(author, location string) (string, error) {
 	return SummarizeMemories(relevantLong, "Long-term memories") + "\n" +
 		SummarizeMemories(relevantShort, "Recent memories"), nil
 }
+
+func PurgeAndStoreShortTermMemory() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		mem, err := GetMemory("memory.msgpack")
+		if err != nil {
+			fmt.Println("Failed to read memory for purge:", err)
+			continue
+		}
+
+		var newShortTerm []MemoryItem
+		changed := false
+
+		for _, m := range mem.ShortTerm {
+			createdTime, _ := time.Parse(time.RFC3339, m.Created)
+			age := time.Since(createdTime)
+
+			switch {
+			case m.Importance >= 0.7:
+				mem.LongTerm = append(mem.LongTerm, m)
+				mem.Meta.PriorityQueue = append(mem.Meta.PriorityQueue, m.Id)
+				changed = true
+
+			case m.Importance < 0.3 && age > (24*time.Hour):
+				mem.Meta.Totalmemories--
+				changed = true
+
+			default:
+				newShortTerm = append(newShortTerm, m)
+			}
+		}
+
+		if changed {
+			mem.ShortTerm = newShortTerm
+			mem.Meta.Lastupdated = time.Now().Format(time.RFC3339)
+
+			if err := SaveMemoryToFile("memory.msgpack", mem); err != nil {
+				fmt.Println("Failed to save memory after purge:", err)
+			} else {
+				fmt.Println("Memory purge completed at", time.Now().Format(time.RFC822))
+			}
+		}
+	}
+}
