@@ -11,6 +11,7 @@ temp/cache/
 latestthread.json
 latestvideo.json
 lib/prompt.go
+airo
 # User-specific files
 *.rsuser
 *.suo
