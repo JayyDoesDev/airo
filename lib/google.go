@@ -42,3 +42,24 @@ func (g *Google) LimitItems(items []*customsearch.Result) []*customsearch.Result
 
 	return items[:g.Limit]
 }
+
+type References struct {
+	Title   string
+	Index   int
+	Url     string
+	Snippet string
+}
+
+func (g *Google) GetReferences(items []*customsearch.Result) []References {
+	if len(items) == 0 {
+		return []References{}
+	}
+
+	var references []References
+
+	for idx, item := range items {
+		references = append(references, References{Title: item.Title, Url: item.Link, Index: idx + 1, Snippet: item.Snippet})
+	}
+
+	return references
+}

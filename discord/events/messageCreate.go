@@ -17,10 +17,20 @@ func HandleMentions(Id string) (string, string) {
 	return "<@" + Id + ">", "<@!" + Id + ">"
 }
 
-func HandleGoogleSearch(resp string, client lib.LibClient, fullPrompt string, mem lib.Memory, s *discordgo.Session, m *discordgo.MessageCreate, guild *discordgo.Guild) (string, bool) {
-	isGoogleSearch := strings.Contains(resp, `SEARCH("`)
+type HandleGoogleSearchOpts struct {
+	Response   string
+	Client     lib.LibClient
+	FullPrompt string
+	Memory     lib.Memory
+	Session    *discordgo.Session
+	Message    *discordgo.MessageCreate
+	Guild      *discordgo.Guild
+}
+
+func HandleGoogleSearch(opts HandleGoogleSearchOpts) (string, bool, []lib.References) {
+	isGoogleSearch := strings.Contains(opts.Response, `SEARCH("`)
 	if !isGoogleSearch {
-		return resp, false
+		return opts.Response, false, []lib.References{}
 	}
 
 	limit, _ := strconv.Atoi(os.Getenv("GOOGLE_RESULT_LIMIT"))
@@ -30,24 +40,26 @@ func HandleGoogleSearch(resp string, client lib.LibClient, fullPrompt string, me
 		Limit:      limit,
 	})
 
-	start := strings.Index(resp, "SEARCH(\"")
-	resp = resp[start:]
-	q := strings.TrimSuffix(strings.TrimPrefix(resp, `SEARCH("`), `")`)
+	start := strings.Index(opts.Response, "SEARCH(\"")
+	opts.Response = opts.Response[start:]
+	q := strings.TrimSuffix(strings.TrimPrefix(opts.Response, `SEARCH("`), `")`)
 
 	results, err := google.Search(q)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Search failed: "+err.Error())
-		return resp, true
+		opts.Session.ChannelMessageSend(opts.Message.ChannelID, "Search failed: "+err.Error())
+		return opts.Response, true, []lib.References{}
 	}
 
 	items := google.LimitItems(results.Items)
+	refs := google.GetReferences(items)
+
 	var newResp string
 
 	if len(items) == 0 {
-		newResp, err = client.Send(
-			m.Author.ID, m.Author.Username, *guild,
-			fullPrompt+lib.SecondPromptResultsNotFound,
-			mem,
+		newResp, err = opts.Client.Send(
+			opts.Message.Author.ID, opts.Message.Author.Username, *opts.Guild,
+			opts.FullPrompt+lib.SecondPromptResultsNotFound,
+			opts.Memory,
 		)
 	} else {
 		var sb strings.Builder
@@ -61,19 +73,19 @@ func HandleGoogleSearch(resp string, client lib.LibClient, fullPrompt string, me
 		secondPrompt.WriteString(sb.String())
 		secondPrompt.WriteString(lib.SecondPromptRules)
 
-		newResp, err = client.Send(
-			m.Author.ID, m.Author.Username, *guild,
+		newResp, err = opts.Client.Send(
+			opts.Message.Author.ID, opts.Message.Author.Username, *opts.Guild,
 			secondPrompt.String(),
 			lib.Memory{ShortTerm: nil, LongTerm: nil},
 		)
 	}
 
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
-		return resp, true
+		opts.Session.ChannelMessageSend(opts.Message.ChannelID, "Error: "+err.Error())
+		return opts.Response, true, refs
 	}
 
-	return newResp, true
+	return newResp, true, refs
 }
 
 type GoogleEmbedOptions struct {
@@ -93,7 +105,7 @@ func GoogleEmbed(description string, opts *GoogleEmbedOptions) *discordgo.Messag
 		Description: description,
 		Color:       color,
 		Footer: &discordgo.MessageEmbedFooter{
-			Text:    "Results provided by Google",
+			Text:    "Search results provided by Google",
 			IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
 		},
 	}
@@ -113,13 +125,45 @@ func GoogleEmbed(description string, opts *GoogleEmbedOptions) *discordgo.Messag
 	return embed
 }
 
+func GoogleReferencesEmbed(refs []lib.References) *discordgo.MessageEmbed {
+	if len(refs) == 0 {
+		return &discordgo.MessageEmbed{
+			Title:       "No References Found",
+			Description: "Google returned no usable search results.",
+			Color:       0x4285F4,
+		}
+	}
+
+	var desc strings.Builder
+	for idx, r := range refs {
+		if idx >= 3 {
+			desc.WriteString("**…and more results were trimmed**")
+			break
+		}
+		desc.WriteString(
+			fmt.Sprintf("**[%d] %s**\n%s\n*%s*\n\n",
+				r.Index, r.Title, r.Url, r.Snippet),
+		)
+	}
+
+	return &discordgo.MessageEmbed{
+		Title:       "🔎 References",
+		Description: desc.String(),
+		Color:       0x4285F4,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text:    "Search results provided by Google",
+			IconURL: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2sSeQqjaUTuZ3gRgkKjidpaipF_l6s72lBw&s",
+		},
+	}
+}
+
 func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
 	}
 
 	mention1, mention2 := HandleMentions(s.State.User.ID)
-
+	var references []lib.References
 	if strings.HasPrefix(m.Content, mention1) || strings.HasPrefix(m.Content, mention2) {
 		err := s.ChannelTyping(m.ChannelID)
 		if err != nil {
@@ -160,7 +204,22 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		isGoogleSearch := strings.Contains(resp, `SEARCH("`)
-		resp, _ = HandleGoogleSearch(resp, client, fullPrompt, mem, s, m, guild)
+
+		var didSearch bool
+		var refs []lib.References
+
+		resp, didSearch, refs = HandleGoogleSearch(HandleGoogleSearchOpts{
+			Response:   resp,
+			Client:     client,
+			FullPrompt: fullPrompt,
+			Memory:     mem,
+			Session:    s,
+			Message:    m,
+			Guild:      guild,
+		})
+
+		references = refs
+		isGoogleSearch = didSearch
 
 		fmt.Println("RAW RESPONSE:")
 		fmt.Println(resp)
@@ -179,7 +238,6 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			fmt.Println(string(jsonOut))
 		}
 
-		var msg *discordgo.Message
 		if len(actionData.Memories) > 0 {
 			for _, mem := range actionData.Memories {
 				lib.CreateMemory(lib.MemoryItem{
@@ -200,16 +258,18 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		}
 
+		var embeds []*discordgo.MessageEmbed
+
 		if actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed" {
-			var embed *discordgo.MessageEmbed
+			var mainEmbed *discordgo.MessageEmbed
 			if isGoogleSearch {
-				embed = GoogleEmbed(actionData.EmbedDescription, &GoogleEmbedOptions{
+				mainEmbed = GoogleEmbed(actionData.EmbedDescription, &GoogleEmbedOptions{
 					Title:     actionData.EmbedTitle,
 					Thumbnail: actionData.EmbedThumbnailUrl,
 					Image:     actionData.EmbedImageUrl,
 				})
 			} else {
-				embed = &discordgo.MessageEmbed{
+				mainEmbed = &discordgo.MessageEmbed{
 					Title:       actionData.EmbedTitle,
 					Description: actionData.EmbedDescription,
 					Thumbnail: &discordgo.MessageEmbedThumbnail{
@@ -221,34 +281,31 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					Color: 0xFF69B4,
 				}
 			}
-			msg, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+
+			embeds = append(embeds, mainEmbed)
+
 		} else {
-			msg, err = s.ChannelMessageSend(m.ChannelID, actionData.ResponseMsg)
+			embeds = append(embeds, &discordgo.MessageEmbed{
+				Description: actionData.ResponseMsg,
+				Color:       0xFF69B4,
+			})
 		}
+
+		if isGoogleSearch {
+			embeds = append(embeds, GoogleEmbed(naturalMsg, &GoogleEmbedOptions{}))
+		}
+
+		if len(references) > 0 {
+			embeds = append(embeds, GoogleReferencesEmbed(references))
+		}
+
+		s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+			Embeds: embeds,
+		})
 
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Failed to send response: "+err.Error())
 			return
-		}
-
-		if !actionData.UseEmbed && strings.ToLower(actionData.ResponseType) != "embed" {
-			var embed *discordgo.MessageEmbed
-			if isGoogleSearch {
-				embed = GoogleEmbed(naturalMsg, &GoogleEmbedOptions{})
-			} else {
-				embed = &discordgo.MessageEmbed{
-					Description: naturalMsg,
-					Color:       0xFF69B4,
-				}
-			}
-			_, err = s.ChannelMessageEditComplex(&discordgo.MessageEdit{
-				Channel: m.ChannelID,
-				ID:      msg.ID,
-				Embeds:  &[]*discordgo.MessageEmbed{embed},
-			})
-			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, "Failed to attach embed: "+err.Error())
-			}
 		}
 
 		allTasks := actionData.Tasks
