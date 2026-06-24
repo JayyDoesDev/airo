@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jayydoesdev/airo/bot/lib"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 func Migrate() (bool, error) {
-	var memory lib.Memory
+	var memory actions.Memory
 
 	jsonMem, err := os.ReadFile("memory.json")
 	if err != nil {
