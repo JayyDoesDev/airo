@@ -10,7 +10,7 @@ dist
 temp/cache/
 latestthread.json
 latestvideo.json
-lib/prompt.go
+lib/prompts.go
 airo
 # User-specific files
 *.rsuser

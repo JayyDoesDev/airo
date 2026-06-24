@@ -17,6 +17,8 @@ func NewClient(provider string, token string) (LibClient, error) {
 		return NewOpenAIClient(token), nil
 	case "anthropic":
 		return NewAnthropicClient(token), nil
+	case "deepseek":
+		return NewDeepSeekClient(token), nil
 	default:
 		return nil, errors.New("this provider is not supported")
 	}

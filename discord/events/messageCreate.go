@@ -58,7 +58,7 @@ func HandleGoogleSearch(opts HandleGoogleSearchOpts) (string, bool, []lib.Refere
 	if len(items) == 0 {
 		newResp, err = opts.Client.Send(
 			opts.Message.Author.ID, opts.Message.Author.Username, *opts.Guild,
-			opts.FullPrompt+lib.SecondPromptResultsNotFound,
+			opts.FullPrompt+"lib.SecondPromptResultsNotFound",
 			opts.Memory,
 		)
 	} else {
@@ -170,7 +170,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 
-		client, err := lib.NewClient("anthropic", os.Getenv("OPENAPI_API_KEY"))
+		client, err := lib.NewClient("deepseek", os.Getenv("DEEPSEEK_API_KEY"))
 		if err != nil {
 			panic(err)
 		}
@@ -240,6 +240,10 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		if len(actionData.Memories) > 0 {
 			for _, mem := range actionData.Memories {
+				location := m.ChannelID
+				if mem.Context != nil {
+					location = mem.Context.Location
+				}
 				lib.CreateMemory(lib.MemoryItem{
 					Id:           lib.GenerateID(),
 					Title:        mem.Title,
@@ -251,7 +255,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					Lastaccessed: time.Now().Format(time.RFC3339),
 					Related:      mem.Related,
 					Context: &lib.MemoryItemContext{
-						Location: mem.Context.Location,
+						Location: location,
 						Author:   m.Author.ID,
 					},
 				})
