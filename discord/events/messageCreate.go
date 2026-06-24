@@ -6,12 +6,31 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jayydoesdev/airo/bot/lib"
 	taskqueue "github.com/jayydoesdev/airo/bot/tasks"
 )
+
+const userCooldown = 5 * time.Second
+const maxDMsPerRequest = 1
+
+var (
+	cooldowns   = map[string]time.Time{}
+	cooldownsMu sync.Mutex
+)
+
+func isOnCooldown(userID string) bool {
+	cooldownsMu.Lock()
+	defer cooldownsMu.Unlock()
+	if t, ok := cooldowns[userID]; ok && time.Since(t) < userCooldown {
+		return true
+	}
+	cooldowns[userID] = time.Now()
+	return false
+}
 
 func HandleMentions(Id string) (string, string) {
 	return "<@" + Id + ">", "<@!" + Id + ">"
@@ -165,6 +184,10 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	mention1, mention2 := HandleMentions(s.State.User.ID)
 	var references []lib.References
 	if strings.HasPrefix(m.Content, mention1) || strings.HasPrefix(m.Content, mention2) {
+		if isOnCooldown(m.Author.ID) {
+			return
+		}
+
 		err := s.ChannelTyping(m.ChannelID)
 		if err != nil {
 			return
@@ -330,8 +353,15 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			})
 		}
 
+		dmCount := 0
 		for _, t := range allTasks {
 			task := t
+			if task.Action == "dm_user" {
+				if dmCount >= maxDMsPerRequest {
+					continue
+				}
+				dmCount++
+			}
 
 			taskqueue.BotQueue.Add(taskqueue.Task{
 				Name:              task.Action,
