@@ -6,6 +6,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jayydoesdev/airo/bot/lib"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 )
 
 var (
@@ -50,7 +51,7 @@ var (
 				SendAnError(s, i, fmt.Sprintf("Error initializing AI client: %v", err))
 				return
 			}
-			mem, err := lib.GetMemory("memory.msgpack")
+			mem, err := actions.GetMemory("memory.msgpack")
 			if err != nil {
 				SendAnError(s, i, fmt.Sprintf("Error sending prompt to %s: %v", provider, err))
 				return

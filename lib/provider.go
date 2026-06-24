@@ -4,10 +4,11 @@ import (
 	"errors"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 )
 
 type LibClient interface {
-	Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error)
+	Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error)
 	Message() string
 }
 

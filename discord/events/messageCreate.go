@@ -11,6 +11,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jayydoesdev/airo/bot/lib"
+	"github.com/jayydoesdev/airo/bot/skills"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 	taskqueue "github.com/jayydoesdev/airo/bot/tasks"
 )
 
@@ -40,20 +42,20 @@ type HandleGoogleSearchOpts struct {
 	Response   string
 	Client     lib.LibClient
 	FullPrompt string
-	Memory     lib.Memory
+	Memory     actions.Memory
 	Session    *discordgo.Session
 	Message    *discordgo.MessageCreate
 	Guild      *discordgo.Guild
 }
 
-func HandleGoogleSearch(opts HandleGoogleSearchOpts) (string, bool, []lib.References) {
+func HandleGoogleSearch(opts HandleGoogleSearchOpts) (string, bool, []skills.References) {
 	isGoogleSearch := strings.Contains(opts.Response, `SEARCH("`)
 	if !isGoogleSearch {
-		return opts.Response, false, []lib.References{}
+		return opts.Response, false, []skills.References{}
 	}
 
 	limit, _ := strconv.Atoi(os.Getenv("GOOGLE_RESULT_LIMIT"))
-	google := lib.GoogelClient(lib.Google{
+	google := skills.GoogelClient(skills.Google{
 		APIKey:     os.Getenv("GOOGLE_API_KEY"),
 		CXEngineID: os.Getenv("GOOGLE_CX_ENGINE_ID"),
 		Limit:      limit,
@@ -66,7 +68,7 @@ func HandleGoogleSearch(opts HandleGoogleSearchOpts) (string, bool, []lib.Refere
 	results, err := google.Search(q)
 	if err != nil {
 		opts.Session.ChannelMessageSend(opts.Message.ChannelID, "Search failed: "+err.Error())
-		return opts.Response, true, []lib.References{}
+		return opts.Response, true, []skills.References{}
 	}
 
 	items := google.LimitItems(results.Items)
@@ -95,7 +97,7 @@ func HandleGoogleSearch(opts HandleGoogleSearchOpts) (string, bool, []lib.Refere
 		newResp, err = opts.Client.Send(
 			opts.Message.Author.ID, opts.Message.Author.Username, *opts.Guild,
 			secondPrompt.String(),
-			lib.Memory{ShortTerm: nil, LongTerm: nil},
+			actions.Memory{ShortTerm: nil, LongTerm: nil},
 		)
 	}
 
@@ -144,7 +146,7 @@ func GoogleEmbed(description string, opts *GoogleEmbedOptions) *discordgo.Messag
 	return embed
 }
 
-func GoogleReferencesEmbed(refs []lib.References) *discordgo.MessageEmbed {
+func GoogleReferencesEmbed(refs []skills.References) *discordgo.MessageEmbed {
 	if len(refs) == 0 {
 		return &discordgo.MessageEmbed{
 			Title:       "No References Found",
@@ -182,7 +184,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	mention1, mention2 := HandleMentions(s.State.User.ID)
-	var references []lib.References
+	var references []skills.References
 	if strings.HasPrefix(m.Content, mention1) || strings.HasPrefix(m.Content, mention2) {
 		if isOnCooldown(m.Author.ID) {
 			return
@@ -199,18 +201,11 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		content := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(m.Content, mention1), mention2))
-		mem, err := lib.GetMemory("memory.msgpack")
+		content = lib.SanitizeInjection(content)
+		mem, err := actions.GetMemory("memory.msgpack")
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
 			return
-		}
-
-		promptMem := "Here are your memories:\n"
-		for _, item := range mem.ShortTerm {
-			promptMem += fmt.Sprintf("- [Short] %s: %s\n", item.Title, item.Content)
-		}
-		for _, item := range mem.LongTerm {
-			promptMem += fmt.Sprintf("- [Long] %s: %s\n", item.Title, item.Content)
 		}
 
 		guild, err := s.Guild(m.GuildID)
@@ -220,7 +215,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		botPerms := getBotPermissions(s, guild, m.ChannelID)
-		fullPrompt := promptMem + "\nYour permissions in this server:\n" + formatPermissions(botPerms) + "\n\nUser says: " + content
+		fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + "\n\nUser says: " + content
 
 		resp, err := client.Send(m.Author.ID, m.Author.Username, *guild, fullPrompt, mem)
 		if err != nil {
@@ -231,7 +226,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		isGoogleSearch := strings.Contains(resp, `SEARCH("`)
 
 		var didSearch bool
-		var refs []lib.References
+		var refs []skills.References
 
 		resp, didSearch, refs = HandleGoogleSearch(HandleGoogleSearchOpts{
 			Response:   resp,
@@ -249,7 +244,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		fmt.Println("RAW RESPONSE:")
 		fmt.Println(resp)
 
-		naturalMsg, actionData, err := lib.ParseAIResponse(resp)
+		naturalMsg, actionData, err := actions.ParseAIResponse(resp)
 
 		actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@everyone", "everyone")
 		actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@here", "here")
@@ -269,8 +264,8 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				if mem.Context != nil {
 					location = mem.Context.Location
 				}
-				lib.CreateMemory(lib.MemoryItem{
-					Id:           lib.GenerateID(),
+				actions.CreateMemory(actions.MemoryItem{
+					Id:           actions.GenerateID(),
 					Title:        mem.Title,
 					Content:      mem.Content,
 					Type:         mem.Type,
@@ -279,7 +274,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					Created:      time.Now().Format(time.RFC3339),
 					Lastaccessed: time.Now().Format(time.RFC3339),
 					Related:      mem.Related,
-					Context: &lib.MemoryItemContext{
+					Context: &actions.MemoryItemContext{
 						Location: location,
 						Author:   m.Author.ID,
 					},
@@ -339,7 +334,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		allTasks := actionData.Tasks
 		if len(allTasks) == 0 && actionData.Action != "" && actionData.TargetUser != "" {
-			allTasks = append(allTasks, lib.Action{
+			allTasks = append(allTasks, actions.Action{
 				Action:            actionData.Action,
 				TargetUser:        actionData.TargetUser,
 				Reason:            actionData.Reason,
@@ -382,16 +377,37 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func MakeExecute(task lib.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {
+func MakeExecute(task actions.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {
 	return func() error {
-		return lib.HandleActions(task, s, m)
+		return actions.HandleActions(task, s, m)
 	}
+}
+
+var (
+	botMemberCache   = map[string]*discordgo.Member{}
+	botMemberCacheMu sync.Mutex
+)
+
+func getBotMember(s *discordgo.Session, guildID string) (*discordgo.Member, error) {
+	botMemberCacheMu.Lock()
+	defer botMemberCacheMu.Unlock()
+
+	if m, ok := botMemberCache[guildID]; ok {
+		return m, nil
+	}
+
+	m, err := s.GuildMember(guildID, s.State.User.ID)
+	if err != nil {
+		return nil, err
+	}
+	botMemberCache[guildID] = m
+	return m, nil
 }
 
 func getBotPermissions(s *discordgo.Session, guild *discordgo.Guild, channelID string) int64 {
 	botID := s.State.User.ID
 
-	member, err := s.GuildMember(guild.ID, botID)
+	member, err := getBotMember(s, guild.ID)
 	if err != nil {
 		return 0
 	}

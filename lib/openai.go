@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -26,7 +27,7 @@ func NewOpenAIClient(token string) *OpenAI {
 	}
 }
 
-func (opai *OpenAI) Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error) {
+func (opai *OpenAI) Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")

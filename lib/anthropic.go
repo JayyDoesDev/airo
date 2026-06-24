@@ -10,6 +10,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/bwmarrin/discordgo"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 )
 
 type Anthropic struct {
@@ -33,7 +34,7 @@ func (a *Anthropic) SetToken(t string) {
 	a.Client = anthropic.NewClient(option.WithAPIKey(t))
 }
 
-func (a *Anthropic) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error) {
+func (a *Anthropic) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")

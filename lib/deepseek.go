@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/cohesion-org/deepseek-go"
+	"github.com/jayydoesdev/airo/bot/skills/actions"
 )
 
 type DeepSeek struct {
@@ -32,7 +33,7 @@ func (ds *DeepSeek) SetToken(token string) {
 	ds.Client = *deepseek.NewClient(token)
 }
 
-func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem Memory) (string, error) {
+func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")

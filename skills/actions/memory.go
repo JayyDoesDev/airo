@@ -1,4 +1,4 @@
-package lib
+package actions
 
 import (
 	"crypto/rand"
@@ -118,7 +118,8 @@ func StoreToMemory(item MemoryItem) error {
 		mem.Meta.PriorityQueue = append(mem.Meta.PriorityQueue, item.Id)
 	}
 
-	if item.Importance >= 0.7 {
+	isLong := strings.ToLower(item.Type) == "long" || item.Importance >= 0.7
+	if isLong {
 		mem.LongTerm = append(mem.LongTerm, item)
 	} else {
 		mem.ShortTerm = append(mem.ShortTerm, item)
@@ -218,12 +219,7 @@ func PurgeAndStoreShortTermMemory() {
 			age := time.Since(createdTime)
 
 			switch {
-			case m.Importance >= 0.7:
-				mem.LongTerm = append(mem.LongTerm, m)
-				mem.Meta.PriorityQueue = append(mem.Meta.PriorityQueue, m.Id)
-				changed = true
-
-			case m.Importance < 0.3 && age > (24*time.Hour):
+			case m.Importance < 0.3 && age > 24*time.Hour:
 				mem.Meta.Totalmemories--
 				changed = true
 
