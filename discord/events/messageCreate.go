@@ -163,9 +163,49 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		}
 	}
-	if actionData.Action == "generate_chart" && chartCfg == nil {
-		s.ChannelMessageSend(m.ChannelID, "I tried to make a chart but got no config. Try again with more detail!")
-		return
+
+	drawingCfg := actionData.Drawing
+	if drawingCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "generate_drawing" && t.Drawing != nil {
+				drawingCfg = t.Drawing
+				break
+			}
+		}
+	}
+
+	pixelArtCfg := actionData.PixelArt
+	if pixelArtCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "generate_pixel_art" && t.PixelArt != nil {
+				pixelArtCfg = t.PixelArt
+				break
+			}
+		}
+	}
+
+	benchmarkCfg := actionData.Benchmark
+	if benchmarkCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "run_benchmark" && t.Benchmark != nil {
+				benchmarkCfg = t.Benchmark
+				break
+			}
+		}
+	}
+	if benchmarkCfg != nil && chartCfg == nil {
+		results, err := skills.RunBenchmark(*benchmarkCfg)
+		if err != nil {
+			fmt.Println("[benchmark] error:", err)
+		} else {
+			variable := benchmarkCfg.Variable
+			if variable == "" {
+				variable = "x"
+			}
+			generated := skills.BenchmarkToChart(results, variable)
+			chartCfg = &generated
+		}
+		benchmarkCfg = nil
 	}
 
 	var chartPNG []byte
@@ -177,7 +217,25 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	embeds, files := buildMessage(actionData, didSearch, refs, chartPNG, chartCfg)
+	var drawingPNG []byte
+	if drawingCfg != nil {
+		drawingPNG, err = skills.RenderDrawing(*drawingCfg)
+		if err != nil {
+			fmt.Println("[drawing] render error:", err)
+			drawingPNG = nil
+		}
+	}
+
+	var pixelArtPNG []byte
+	if pixelArtCfg != nil {
+		pixelArtPNG, err = skills.RenderPixelArt(*pixelArtCfg)
+		if err != nil {
+			fmt.Println("[pixelart] render error:", err)
+			pixelArtPNG = nil
+		}
+	}
+
+	embeds, files := buildMessage(actionData, didSearch, refs, chartPNG, chartCfg, drawingPNG, pixelArtPNG)
 	s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
 		Embeds:    embeds,
 		Files:     files,
@@ -237,7 +295,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.References, chartPNG []byte, chartCfg *skills.ChartConfig) ([]*discordgo.MessageEmbed, []*discordgo.File) {
+func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.References, chartPNG []byte, chartCfg *skills.ChartConfig, drawingPNG []byte, pixelArtPNG []byte) ([]*discordgo.MessageEmbed, []*discordgo.File) {
 	var embeds []*discordgo.MessageEmbed
 	var files []*discordgo.File
 
@@ -271,6 +329,22 @@ func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.R
 		files = append(files, &discordgo.File{
 			Name:   filename,
 			Reader: bytes.NewReader(chartPNG),
+		})
+	}
+
+	if drawingPNG != nil {
+		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://drawing.png"}
+		files = append(files, &discordgo.File{
+			Name:   "drawing.png",
+			Reader: bytes.NewReader(drawingPNG),
+		})
+	}
+
+	if pixelArtPNG != nil {
+		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://pixel_art.png"}
+		files = append(files, &discordgo.File{
+			Name:   "pixel_art.png",
+			Reader: bytes.NewReader(pixelArtPNG),
 		})
 	}
 

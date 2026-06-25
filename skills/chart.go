@@ -60,6 +60,12 @@ func RenderChart(cfg ChartConfig) ([]byte, error) {
 		baseTheme = charts.ThemeAnt
 	}
 
+	isLight := cfg.Theme == "light" || cfg.Theme == "ant"
+	bgColor := drawing.Color{R: 1, G: 1, B: 1, A: 0}
+	if isLight {
+		bgColor = drawing.Color{R: 255, G: 255, B: 255, A: 255}
+	}
+
 	theme := baseTheme
 	if colors := datasetColors(cfg.Datasets); len(colors) > 0 {
 		id := customThemeCounter.Add(1)
@@ -69,21 +75,19 @@ func RenderChart(cfg ChartConfig) ([]byte, error) {
 			IsDarkMode:         base.IsDark(),
 			AxisStrokeColor:    base.GetAxisStrokeColor(),
 			AxisSplitLineColor: base.GetAxisSplitLineColor(),
-			BackgroundColor:    drawing.Color{R: 1, G: 1, B: 1, A: 0},
+			BackgroundColor:    bgColor,
 			TextColor:          base.GetTextColor(),
 			SeriesColors:       colors,
 		})
 		theme = name
 	}
 
-	transparent := drawing.Color{R: 1, G: 1, B: 1, A: 0}
-
 	opts := []charts.OptionFunc{
 		charts.PNGTypeOption(),
 		charts.ThemeOptionFunc(theme),
 		charts.WidthOptionFunc(width),
 		charts.HeightOptionFunc(height),
-		charts.BackgroundColorOptionFunc(transparent),
+		charts.BackgroundColorOptionFunc(bgColor),
 	}
 
 	if cfg.Title != "" {
