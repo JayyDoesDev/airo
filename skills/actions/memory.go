@@ -200,6 +200,56 @@ func GetSummarizedMemory(author, location string) (string, error) {
 		SummarizeMemories(relevantShort, "Recent memories"), nil
 }
 
+func PruneMemoryForPrompt(mem Memory, authorID, channelID string, maxShort, maxLong int) Memory {
+	score := func(item MemoryItem) float64 {
+		s := float64(item.Importance)
+		t, err := time.Parse(time.RFC3339, item.Lastaccessed)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, item.Created)
+		}
+		age := time.Since(t).Hours()
+		recency := 1.0 / (1.0 + age/24.0)
+		authorBoost := 0.0
+		if item.Context != nil && item.Context.Author == authorID {
+			authorBoost = 0.3
+		}
+		channelBoost := 0.0
+		if item.Context != nil && channelID != "" && item.Context.Location == channelID {
+			channelBoost = 0.1
+		}
+		return s + recency*0.3 + authorBoost + channelBoost
+	}
+
+	sortByScore := func(items []MemoryItem) []MemoryItem {
+		sorted := make([]MemoryItem, len(items))
+		copy(sorted, items)
+		for i := 0; i < len(sorted); i++ {
+			for j := i + 1; j < len(sorted); j++ {
+				if score(sorted[j]) > score(sorted[i]) {
+					sorted[i], sorted[j] = sorted[j], sorted[i]
+				}
+			}
+		}
+		return sorted
+	}
+
+	short := sortByScore(mem.ShortTerm)
+	long := sortByScore(mem.LongTerm)
+
+	if len(short) > maxShort {
+		short = short[:maxShort]
+	}
+	if len(long) > maxLong {
+		long = long[:maxLong]
+	}
+
+	return Memory{
+		ShortTerm: short,
+		LongTerm:  long,
+		Meta:      mem.Meta,
+	}
+}
+
 func PurgeAndStoreShortTermMemory() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()

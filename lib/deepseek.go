@@ -36,7 +36,8 @@ func (ds *DeepSeek) SetToken(token string) {
 func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
 	ctx := context.Background()
 
-	memJSON, _ := json.MarshalIndent(mem, "", "  ")
+	pruned := actions.PruneMemoryForPrompt(mem, authorID, "", 10, 20)
+	memJSON, _ := json.MarshalIndent(pruned, "", "  ")
 
 	var roleNames []string
 	for _, role := range serverInfo.Roles {
@@ -54,9 +55,7 @@ func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.G
 - NSFW Level: %v
 - Roles: %s`, serverInfo.Name, serverInfo.ID, serverInfo.MemberCount, serverInfo.OwnerID, serverInfo.NSFWLevel, rolesFormatted)
 
-	userPrompt := fmt.Sprintf(`%s
-
-User info:
+	userPrompt := fmt.Sprintf(`User info:
 - Discord User ID: %s
 - Username: %s
 
@@ -67,10 +66,11 @@ User message:
 %s
 
 Your Memory: %s
-`, SystemPrompt, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
+`, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	req := &deepseek.ChatCompletionRequest{
-		Model: deepseek.DeepSeekV4Flash,
+		Model:           deepseek.DeepSeekV4Flash,
+		ReasoningEffort: "low",
 		Messages: []deepseek.ChatCompletionMessage{
 			{Role: deepseek.ChatMessageRoleSystem, Content: SystemPrompt},
 			{Role: deepseek.ChatMessageRoleUser, Content: userPrompt},
@@ -101,6 +101,12 @@ Your Memory: %s
 
 	ds.Prompt = userPrompt
 	ds.Response = resp.Choices[0].Message.Content
+
+	if u := resp.Usage; u.PromptCacheHitTokens > 0 || u.PromptCacheMissTokens > 0 {
+		fmt.Printf("[cache] hit=%d miss=%d total_prompt=%d completion=%d\n",
+			u.PromptCacheHitTokens, u.PromptCacheMissTokens,
+			u.PromptTokens, u.CompletionTokens)
+	}
 
 	return ds.Response, nil
 }

@@ -120,8 +120,11 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	_, actionData, err := actions.ParseAIResponse(resp)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error parsing AI response: "+err.Error())
-		return
+		fmt.Println("[parse] fallback to raw response:", err)
+		actionData = actions.ActionData{
+			Action:      "none",
+			ResponseMsg: strings.TrimSpace(resp),
+		}
 	}
 
 	actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@everyone", "everyone")
@@ -205,7 +208,171 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			generated := skills.BenchmarkToChart(results, variable)
 			chartCfg = &generated
 		}
-		benchmarkCfg = nil
+	}
+
+	plotCfg := actionData.Plot
+	if plotCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "plot_function" && t.Plot != nil {
+				plotCfg = t.Plot
+				break
+			}
+		}
+	}
+	if plotCfg != nil && chartCfg == nil {
+		generated, err := skills.PlotToChart(*plotCfg)
+		if err != nil {
+			fmt.Println("[plot] error:", err)
+		} else {
+			chartCfg = &generated
+		}
+	}
+
+	statsCfg := actionData.Stats
+	if statsCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "calculate_stats" && t.Stats != nil {
+				statsCfg = t.Stats
+				break
+			}
+		}
+	}
+	var statsText string
+	if statsCfg != nil {
+		statsResult, statsChart, err := skills.CalculateStats(*statsCfg)
+		if err != nil {
+			fmt.Println("[stats] error:", err)
+		} else {
+			statsText = skills.StatsResultToText(statsResult, statsCfg.Label)
+			if chartCfg == nil {
+				chartCfg = &statsChart
+			}
+		}
+	}
+
+	solverCfg := actionData.Solver
+	if solverCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "solve_equation" && t.Solver != nil {
+				solverCfg = t.Solver
+				break
+			}
+		}
+	}
+	var solverText string
+	if solverCfg != nil {
+		solverResult, err := skills.SolveEquation(*solverCfg)
+		if err != nil {
+			fmt.Println("[solver] error:", err)
+		} else {
+			solverText = skills.SolverResultToText(solverResult, solverCfg.Equation, solverCfg.Variable)
+			if chartCfg == nil {
+				chartCfg = &solverResult.Chart
+			}
+		}
+	}
+
+	latexCfg := actionData.Latex
+	if latexCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "render_latex" && t.Latex != nil {
+				latexCfg = t.Latex
+				break
+			}
+		}
+	}
+	var latexPNG []byte
+	if latexCfg != nil {
+		latexPNG, err = skills.RenderLatex(*latexCfg)
+		if err != nil {
+			fmt.Println("[latex] render error:", err)
+			latexPNG = nil
+		}
+	}
+
+	unitCfg := actionData.UnitConvert
+	if unitCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "convert_unit" && t.UnitConvert != nil {
+				unitCfg = t.UnitConvert
+				break
+			}
+		}
+	}
+	var unitText string
+	if unitCfg != nil {
+		r, err := skills.ConvertUnit(*unitCfg)
+		if err != nil {
+			unitText = "unit convert error: " + err.Error()
+		} else {
+			unitText = r.Formula
+		}
+	}
+
+	ntCfg := actionData.NumberTheory
+	if ntCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "number_theory" && t.NumberTheory != nil {
+				ntCfg = t.NumberTheory
+				break
+			}
+		}
+	}
+	var ntText string
+	if ntCfg != nil {
+		r, err := skills.RunNumberTheory(*ntCfg)
+		if err != nil {
+			ntText = "number theory error: " + err.Error()
+		} else {
+			ntText = r.Output
+		}
+	}
+
+	matrixCfg := actionData.Matrix
+	if matrixCfg == nil {
+		for _, t := range actionData.Tasks {
+			if t.Action == "matrix_operation" && t.Matrix != nil {
+				matrixCfg = t.Matrix
+				break
+			}
+		}
+	}
+	var matrixText string
+	if matrixCfg != nil {
+		r, err := skills.RunMatrix(*matrixCfg)
+		if err != nil {
+			matrixText = "matrix error: " + err.Error()
+		} else {
+			matrixText = r.Output
+			if latexCfg == nil && len(r.LatexExprs) > 0 {
+				latexCfg = &skills.LatexConfig{
+					Expressions: r.LatexExprs,
+					DarkMode:    true,
+					FontSize:    1.2,
+				}
+				latexPNG, err = skills.RenderLatex(*latexCfg)
+				if err != nil {
+					fmt.Println("[latex] matrix render error:", err)
+					latexPNG = nil
+				}
+			}
+		}
+	}
+
+	if statsText != "" {
+		actionData.ResponseMsg = statsText + "\n" + actionData.ResponseMsg
+	}
+	if solverText != "" {
+		actionData.ResponseMsg = solverText + "\n" + actionData.ResponseMsg
+	}
+	if unitText != "" {
+		actionData.ResponseMsg = unitText + "\n" + actionData.ResponseMsg
+	}
+	if ntText != "" {
+		actionData.ResponseMsg = ntText + "\n" + actionData.ResponseMsg
+	}
+	if matrixText != "" {
+		actionData.ResponseMsg = matrixText + "\n" + actionData.ResponseMsg
 	}
 
 	var chartPNG []byte
@@ -235,7 +402,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	embeds, files := buildMessage(actionData, didSearch, refs, chartPNG, chartCfg, drawingPNG, pixelArtPNG)
+	embeds, files := buildMessage(actionData, didSearch, refs, chartPNG, chartCfg, drawingPNG, pixelArtPNG, latexPNG)
 	s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
 		Embeds:    embeds,
 		Files:     files,
@@ -272,7 +439,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			continue
 		}
 		if task.Action == "dm_user" {
-			if dmCount >= maxDMsPerRequest {
+			if dmCount >= maxDMsPerRequest || isDMOnCooldown() {
 				continue
 			}
 			dmCount++
@@ -295,7 +462,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.References, chartPNG []byte, chartCfg *skills.ChartConfig, drawingPNG []byte, pixelArtPNG []byte) ([]*discordgo.MessageEmbed, []*discordgo.File) {
+func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.References, chartPNG []byte, chartCfg *skills.ChartConfig, drawingPNG []byte, pixelArtPNG []byte, latexPNG []byte) ([]*discordgo.MessageEmbed, []*discordgo.File) {
 	var embeds []*discordgo.MessageEmbed
 	var files []*discordgo.File
 
@@ -345,6 +512,14 @@ func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.R
 		files = append(files, &discordgo.File{
 			Name:   "pixel_art.png",
 			Reader: bytes.NewReader(pixelArtPNG),
+		})
+	}
+
+	if latexPNG != nil {
+		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://latex.png"}
+		files = append(files, &discordgo.File{
+			Name:   "latex.png",
+			Reader: bytes.NewReader(latexPNG),
 		})
 	}
 

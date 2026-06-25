@@ -24,6 +24,13 @@ type Action struct {
 	Drawing           *skills.DrawingConfig     `json:"drawing,omitempty"`
 	PixelArt          *skills.PixelArtConfig    `json:"pixel_art,omitempty"`
 	Benchmark         *skills.BenchmarkConfig   `json:"benchmark,omitempty"`
+	Plot              *skills.PlotConfig        `json:"plot,omitempty"`
+	Stats             *skills.StatsConfig       `json:"stats,omitempty"`
+	Solver            *skills.SolverConfig      `json:"solver,omitempty"`
+	Latex             *skills.LatexConfig       `json:"latex,omitempty"`
+	UnitConvert       *skills.UnitConvertConfig `json:"unit_convert,omitempty"`
+	NumberTheory      *skills.NumberTheoryConfig `json:"number_theory,omitempty"`
+	Matrix            *skills.MatrixConfig      `json:"matrix,omitempty"`
 	StatusType        string                    `json:"status_type,omitempty"`
 	ActivityType      string                    `json:"activity_type,omitempty"`
 	ActivityText      string                    `json:"activity_text,omitempty"`
@@ -50,7 +57,14 @@ type ActionData struct {
 	Drawing           *skills.DrawingConfig   `json:"drawing,omitempty"`
 	PixelArt          *skills.PixelArtConfig  `json:"pixel_art,omitempty"`
 	Benchmark         *skills.BenchmarkConfig `json:"benchmark,omitempty"`
-	StatusType        string                  `json:"status_type,omitempty"`
+	Plot              *skills.PlotConfig      `json:"plot,omitempty"`
+	Stats             *skills.StatsConfig     `json:"stats,omitempty"`
+	Solver            *skills.SolverConfig    `json:"solver,omitempty"`
+	Latex             *skills.LatexConfig      `json:"latex,omitempty"`
+	UnitConvert       *skills.UnitConvertConfig `json:"unit_convert,omitempty"`
+	NumberTheory      *skills.NumberTheoryConfig `json:"number_theory,omitempty"`
+	Matrix            *skills.MatrixConfig     `json:"matrix,omitempty"`
+	StatusType        string                   `json:"status_type,omitempty"`
 	ActivityType      string                  `json:"activity_type,omitempty"`
 	ActivityText      string                  `json:"activity_text,omitempty"`
 	SpeakContent      string                  `json:"speak_content,omitempty"`
