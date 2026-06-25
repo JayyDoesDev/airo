@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -188,16 +189,47 @@ func (exa *Exa) LimitItems(items []ResultBody) []ResultBody {
 func (exa *Exa) GetReferences(items []ResultBody) []References {
 	var refs []References
 	for i, item := range items {
-		snippet := item.Summary
+		snippet := CleanSnippet(item.Summary)
 		if snippet == "" && len(item.Highlights) > 0 {
-			snippet = item.Highlights[0]
+			snippet = CleanSnippet(item.Highlights[0])
+		}
+		if len(snippet) > 150 {
+			snippet = snippet[:150] + "…"
 		}
 		refs = append(refs, References{
-			Title:   item.Title,
+			Title:   StripMarkdown(item.Title),
 			Index:   i + 1,
 			Url:     item.URL,
 			Snippet: snippet,
 		})
 	}
 	return refs
+}
+
+func CleanSnippet(s string) string {
+	s = strings.TrimSpace(s)
+	var lines []string
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "..." || line == "…" || line == "•" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return StripMarkdown(strings.Join(lines, " "))
+}
+
+func StripMarkdown(s string) string {
+	s = strings.ReplaceAll(s, "**", "")
+	s = strings.ReplaceAll(s, "__", "")
+	s = strings.ReplaceAll(s, "*", "")
+	s = strings.ReplaceAll(s, "_", " ")
+	s = strings.ReplaceAll(s, "~~", "")
+	s = strings.ReplaceAll(s, "||", "")
+	s = strings.ReplaceAll(s, "```", "")
+	s = strings.ReplaceAll(s, "`", "")
+	s = strings.TrimLeft(s, "# ")
+	s = strings.ReplaceAll(s, "\n> ", " ")
+	s = strings.TrimPrefix(s, "> ")
+	return strings.TrimSpace(s)
 }

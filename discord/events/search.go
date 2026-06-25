@@ -60,9 +60,12 @@ func HandleSearch(opts SearchOpts) (string, bool, []skills.References) {
 		var sb strings.Builder
 		sb.WriteString(lib.SecondPromptTitle)
 		for i, item := range items {
-			snippet := item.Summary
+			snippet := skills.CleanSnippet(item.Summary)
 			if snippet == "" && len(item.Highlights) > 0 {
-				snippet = item.Highlights[0]
+				snippet = skills.CleanSnippet(item.Highlights[0])
+			}
+			if len(snippet) > 300 {
+				snippet = snippet[:300] + "…"
 			}
 			sb.WriteString(fmt.Sprintf("[%d] %s\n%s\n%s\n\n", i+1, item.Title, item.URL, snippet))
 		}
