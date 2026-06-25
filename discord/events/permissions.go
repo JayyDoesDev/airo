@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -10,7 +11,22 @@ import (
 var (
 	botMemberCache   = map[string]*discordgo.Member{}
 	botMemberCacheMu sync.Mutex
+
+	voiceStateCache   = map[string]string{} // "guildID:userID" -> channelID
+	voiceStateCacheMu sync.RWMutex
 )
+
+func OnVoiceStateUpdate(_ *discordgo.Session, v *discordgo.VoiceStateUpdate) {
+	key := v.GuildID + ":" + v.UserID
+	voiceStateCacheMu.Lock()
+	if v.ChannelID == "" {
+		delete(voiceStateCache, key)
+	} else {
+		voiceStateCache[key] = v.ChannelID
+	}
+	voiceStateCacheMu.Unlock()
+	fmt.Printf("[voice] state update: userID=%s channelID=%q\n", v.UserID, v.ChannelID)
+}
 
 func getBotMember(s *discordgo.Session, guildID string) (*discordgo.Member, error) {
 	botMemberCacheMu.Lock()
@@ -91,6 +107,17 @@ func getBotPermissions(s *discordgo.Session, guild *discordgo.Guild, channelID s
 	}
 
 	return perms
+}
+
+func resolveUserVoiceChannel(_ *discordgo.Session, guildID, userID string) (string, error) {
+	key := guildID + ":" + userID
+	voiceStateCacheMu.RLock()
+	ch, ok := voiceStateCache[key]
+	voiceStateCacheMu.RUnlock()
+	if ok && ch != "" {
+		return ch, nil
+	}
+	return "", fmt.Errorf("user not in voice channel")
 }
 
 func formatPermissions(perms int64) string {

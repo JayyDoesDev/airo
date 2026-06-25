@@ -1,10 +1,12 @@
 package actions
 
 import (
+	"bytes"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/jayydoesdev/airo/bot/skills"
 )
 
 func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate) error {
@@ -174,6 +176,52 @@ func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate
 			s.ChannelMessageSend(m.ChannelID, roleList)
 		}
 
+		return nil
+
+	case "generate_chart":
+		if task.Chart == nil {
+			s.ChannelMessageSend(m.ChannelID, "No chart config provided.")
+			return nil
+		}
+		png, err := skills.RenderChart(*task.Chart)
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Failed to render chart: "+err.Error())
+			return err
+		}
+		title := task.Chart.Title
+		if title == "" {
+			title = "chart"
+		}
+		_, err = s.ChannelFileSendWithMessage(m.ChannelID, task.ResponseMsg, title+".png", bytes.NewReader(png))
+		return err
+
+	case "set_status":
+		status := task.StatusType
+		if status == "" {
+			status = "online"
+		}
+		activityType := discordgo.ActivityType(0)
+		switch strings.ToLower(task.ActivityType) {
+		case "listening":
+			activityType = discordgo.ActivityTypeListening
+		case "watching":
+			activityType = discordgo.ActivityTypeWatching
+		case "competing":
+			activityType = discordgo.ActivityTypeCompeting
+		case "streaming":
+			activityType = discordgo.ActivityTypeStreaming
+		}
+		return s.UpdateStatusComplex(discordgo.UpdateStatusData{
+			Status: status,
+			Activities: []*discordgo.Activity{
+				{
+					Name: task.ActivityText,
+					Type: activityType,
+				},
+			},
+		})
+
+	case "join_voice", "leave_voice", "speak_in_voice":
 		return nil
 
 	default:

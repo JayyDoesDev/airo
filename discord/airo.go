@@ -11,7 +11,7 @@ import (
 
 func StartAiro(t string) {
 	discord, err := discordgo.New("Bot " + t)
-	discord.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions
+	discord.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessageReactions | discordgo.IntentsGuildVoiceStates
 	if err != nil {
 		panic(err)
 	}
@@ -20,6 +20,7 @@ func StartAiro(t string) {
 		events.OnReady,
 		events.OnMessageCreate,
 		events.OnInteractionCreate,
+		events.OnVoiceStateUpdate,
 	}
 
 	for _, h := range botevents {

@@ -3,51 +3,61 @@ package actions
 import (
 	"encoding/json"
 	"errors"
-	"regexp"
 	"strings"
+
+	"github.com/jayydoesdev/airo/bot/skills"
 )
 
 type Action struct {
-	Action            string `json:"action"`
-	TargetUser        string `json:"target_user"`
-	Reason            string `json:"reason,omitempty"`
-	Role              string `json:"role,omitempty"`
-	DMContent         string `json:"dm_content,omitempty"`
-	ResponseMsg       string `json:"response,omitempty"`
-	EmbedTitle        string `json:"embed_title,omitempty"`
-	EmbedDescription  string `json:"embed_description,omitempty"`
-	EmbedThumbnailUrl string `json:"embed_thumbnail_url,omitempty"`
-	EmbedImageUrl     string `json:"embed_image_url,omitempty"`
-	UseEmbed          bool   `json:"use_embed,omitempty"`
+	Action            string              `json:"action"`
+	TargetUser        string              `json:"target_user"`
+	Reason            string              `json:"reason,omitempty"`
+	Role              string              `json:"role,omitempty"`
+	DMContent         string              `json:"dm_content,omitempty"`
+	ResponseMsg       string              `json:"response,omitempty"`
+	EmbedTitle        string              `json:"embed_title,omitempty"`
+	EmbedDescription  string              `json:"embed_description,omitempty"`
+	EmbedThumbnailUrl string              `json:"embed_thumbnail_url,omitempty"`
+	EmbedImageUrl     string              `json:"embed_image_url,omitempty"`
+	UseEmbed          bool                `json:"use_embed,omitempty"`
+	Chart             *skills.ChartConfig `json:"chart,omitempty"`
+	StatusType        string              `json:"status_type,omitempty"`
+	ActivityType      string              `json:"activity_type,omitempty"`
+	ActivityText      string              `json:"activity_text,omitempty"`
+	SpeakContent      string              `json:"speak_content,omitempty"`
+	VoiceChannelID    string              `json:"-"`
 }
 
 type ActionData struct {
-	Action            string       `json:"action"`
-	TargetUser        string       `json:"target_user"`
-	Reason            string       `json:"reason,omitempty"`
-	Role              string       `json:"role,omitempty"`
-	DMContent         string       `json:"dm_content,omitempty"`
-	ResponseMsg       string       `json:"response"`
-	ResponseType      string       `json:"response_type"`
-	EmbedTitle        string       `json:"embed_title,omitempty"`
-	EmbedDescription  string       `json:"embed_description,omitempty"`
-	EmbedThumbnailUrl string       `json:"embed_thumbnail_url,omitempty"`
-	EmbedImageUrl     string       `json:"embed_image_url,omitempty"`
-	UseEmbed          bool         `json:"use_embed,omitempty"`
-	Tasks             []Action     `json:"tasks,omitempty"`
-	Memories          []MemoryItem `json:"memories,omitempty"`
+	Action            string              `json:"action"`
+	TargetUser        string              `json:"target_user"`
+	Reason            string              `json:"reason,omitempty"`
+	Role              string              `json:"role,omitempty"`
+	DMContent         string              `json:"dm_content,omitempty"`
+	ResponseMsg       string              `json:"response"`
+	ResponseType      string              `json:"response_type"`
+	EmbedTitle        string              `json:"embed_title,omitempty"`
+	EmbedDescription  string              `json:"embed_description,omitempty"`
+	EmbedThumbnailUrl string              `json:"embed_thumbnail_url,omitempty"`
+	EmbedImageUrl     string              `json:"embed_image_url,omitempty"`
+	UseEmbed          bool                `json:"use_embed,omitempty"`
+	Tasks             []Action            `json:"tasks,omitempty"`
+	Memories          []MemoryItem        `json:"memories,omitempty"`
+	Chart             *skills.ChartConfig `json:"chart,omitempty"`
+	StatusType        string              `json:"status_type,omitempty"`
+	ActivityType      string              `json:"activity_type,omitempty"`
+	ActivityText      string              `json:"activity_text,omitempty"`
+	SpeakContent      string              `json:"speak_content,omitempty"`
+	VoiceChannelID    string              `json:"-"`
 }
 
 func ParseAIResponse(raw string) (string, ActionData, error) {
 	var data ActionData
 
-	re := regexp.MustCompile(`(?s)\{.*\}`)
-	matches := re.FindAllString(raw, -1)
-	if len(matches) == 0 {
+	jsonStr, ok := lastTopLevelJSON(raw)
+	if !ok {
 		return "", data, errors.New("no JSON object found in response")
 	}
-
-	jsonStr := matches[len(matches)-1]
 
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		return "", data, err
@@ -57,4 +67,47 @@ func ParseAIResponse(raw string) (string, ActionData, error) {
 	natural = strings.TrimSpace(natural)
 
 	return natural, data, nil
+}
+
+func lastTopLevelJSON(raw string) (string, bool) {
+	var last string
+	found := false
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '{' {
+			continue
+		}
+		depth := 0
+		inStr := false
+		escape := false
+		for j := i; j < len(raw); j++ {
+			c := raw[j]
+			if escape {
+				escape = false
+				continue
+			}
+			if c == '\\' && inStr {
+				escape = true
+				continue
+			}
+			if c == '"' {
+				inStr = !inStr
+				continue
+			}
+			if inStr {
+				continue
+			}
+			if c == '{' {
+				depth++
+			} else if c == '}' {
+				depth--
+				if depth == 0 {
+					last = raw[i : j+1]
+					found = true
+					i = j // skip past this block before continuing outer scan
+					break
+				}
+			}
+		}
+	}
+	return last, found
 }

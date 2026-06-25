@@ -69,26 +69,34 @@ User message:
 Your Memory: %s
 `, SystemPrompt, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
-	resp, err := ds.Client.CreateChatCompletion(ctx, &deepseek.ChatCompletionRequest{
+	req := &deepseek.ChatCompletionRequest{
 		Model: deepseek.DeepSeekV4Flash,
 		Messages: []deepseek.ChatCompletionMessage{
 			{Role: deepseek.ChatMessageRoleSystem, Content: SystemPrompt},
 			{Role: deepseek.ChatMessageRoleUser, Content: userPrompt},
 		},
-	})
+	}
 
-	if err != nil {
-		errMsg := err.Error()
-		const prefix = "message: "
-		idx := strings.Index(errMsg, prefix)
-		if idx != -1 {
-			msg := errMsg[idx+len(prefix):]
-			if commaIdx := strings.Index(msg, ","); commaIdx != -1 {
-				msg = msg[:commaIdx]
-			}
-			return "", errors.New(strings.TrimSpace(msg))
+	var resp *deepseek.ChatCompletionResponse
+	var err error
+	for attempt := range 3 {
+		resp, err = ds.Client.CreateChatCompletion(ctx, req)
+		if err == nil {
+			break
 		}
-		return "", err
+		if attempt == 2 {
+			errMsg := err.Error()
+			const prefix = "message: "
+			idx := strings.Index(errMsg, prefix)
+			if idx != -1 {
+				msg := errMsg[idx+len(prefix):]
+				if commaIdx := strings.Index(msg, ","); commaIdx != -1 {
+					msg = msg[:commaIdx]
+				}
+				return "", errors.New(strings.TrimSpace(msg))
+			}
+			return "", err
+		}
 	}
 
 	ds.Prompt = userPrompt
