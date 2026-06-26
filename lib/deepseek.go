@@ -2,7 +2,6 @@ package lib
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -36,41 +35,17 @@ func (ds *DeepSeek) SetToken(token string) {
 func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
 	ctx := context.Background()
 
-	pruned := actions.PruneMemoryForPrompt(mem, authorID, "", 10, 20)
-	memJSON, _ := json.MarshalIndent(pruned, "", "  ")
+	pruned := actions.PruneMemoryForPrompt(mem, authorID, "", 8, 15)
+	memText := formatMemory(pruned)
 
-	var roleNames []string
-	for _, role := range serverInfo.Roles {
-		roleNames = append(roleNames, role.Name)
-	}
-	rolesFormatted := "None"
-	if len(roleNames) > 0 {
-		rolesFormatted = strings.Join(roleNames, ", ")
-	}
+	serverDescription := fmt.Sprintf("Server: %s (ID: %s, %d members)", serverInfo.Name, serverInfo.ID, serverInfo.MemberCount)
 
-	serverDescription := fmt.Sprintf(`- Server Name: %s
-- Server ID: %s
-- Member Count: %d
-- Owner ID: %s
-- NSFW Level: %v
-- Roles: %s`, serverInfo.Name, serverInfo.ID, serverInfo.MemberCount, serverInfo.OwnerID, serverInfo.NSFWLevel, rolesFormatted)
-
-	userPrompt := fmt.Sprintf(`User info:
-- Discord User ID: %s
-- Username: %s
-
-Server Info:
-%s
-
-User message:
-%s
-
-Your Memory: %s
-`, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
+	userPrompt := fmt.Sprintf("[%s] %s (ID: %s): %s\n%s", serverDescription, authorUsername, authorID, userMessage, memText)
 
 	req := &deepseek.ChatCompletionRequest{
 		Model:           deepseek.DeepSeekV4Flash,
 		ReasoningEffort: "low",
+		ResponseFormat:  &deepseek.ResponseFormat{Type: "json_object"},
 		Messages: []deepseek.ChatCompletionMessage{
 			{Role: deepseek.ChatMessageRoleSystem, Content: SystemPrompt},
 			{Role: deepseek.ChatMessageRoleUser, Content: userPrompt},
@@ -113,4 +88,31 @@ Your Memory: %s
 
 func (ds *DeepSeek) Message() string {
 	return ds.Response
+}
+
+func formatMemory(mem actions.Memory) string {
+	if len(mem.ShortTerm) == 0 && len(mem.LongTerm) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("Memory:")
+	if len(mem.LongTerm) > 0 {
+		sb.WriteString("\n[long]")
+		for _, m := range mem.LongTerm {
+			sb.WriteString("\n- ")
+			sb.WriteString(m.Title)
+			sb.WriteString(": ")
+			sb.WriteString(m.Content)
+		}
+	}
+	if len(mem.ShortTerm) > 0 {
+		sb.WriteString("\n[recent]")
+		for _, m := range mem.ShortTerm {
+			sb.WriteString("\n- ")
+			sb.WriteString(m.Title)
+			sb.WriteString(": ")
+			sb.WriteString(m.Content)
+		}
+	}
+	return sb.String()
 }

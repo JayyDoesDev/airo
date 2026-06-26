@@ -20,28 +20,43 @@ type DrawingConfig struct {
 }
 
 type DrawingElement struct {
-	Type        string      `json:"type"`
-	X           float64     `json:"x,omitempty"`
-	Y           float64     `json:"y,omitempty"`
-	X1          float64     `json:"x1,omitempty"`
-	Y1          float64     `json:"y1,omitempty"`
-	X2          float64     `json:"x2,omitempty"`
-	Y2          float64     `json:"y2,omitempty"`
-	W           float64     `json:"w,omitempty"`
-	H           float64     `json:"h,omitempty"`
-	R           float64     `json:"r,omitempty"`
-	RX          float64     `json:"rx,omitempty"`
-	RY          float64     `json:"ry,omitempty"`
-	Radius      float64     `json:"radius,omitempty"`
+	Type        string       `json:"type"`
+	X           float64      `json:"x,omitempty"`
+	Y           float64      `json:"y,omitempty"`
+	X1          float64      `json:"x1,omitempty"`
+	Y1          float64      `json:"y1,omitempty"`
+	X2          float64      `json:"x2,omitempty"`
+	Y2          float64      `json:"y2,omitempty"`
+	W           float64      `json:"w,omitempty"`
+	H           float64      `json:"h,omitempty"`
+	R           float64      `json:"r,omitempty"`
+	RX          float64      `json:"rx,omitempty"`
+	RY          float64      `json:"ry,omitempty"`
+	Radius      float64      `json:"radius,omitempty"`
 	Points      [][2]float64 `json:"points,omitempty"`
-	Fill        string      `json:"fill,omitempty"`
-	Stroke      string      `json:"stroke,omitempty"`
-	StrokeWidth float64     `json:"stroke_width,omitempty"`
-	Content     string      `json:"content,omitempty"`
-	Size        float64     `json:"size,omitempty"`
-	Color       string      `json:"color,omitempty"`
-	Align       string      `json:"align,omitempty"`
-	Rotation    float64     `json:"rotation,omitempty"`
+	Fill        string       `json:"fill,omitempty"`
+	Stroke      string       `json:"stroke,omitempty"`
+	StrokeWidth float64      `json:"stroke_width,omitempty"`
+	Content     string       `json:"content,omitempty"`
+	Size        float64      `json:"size,omitempty"`
+	Color       string       `json:"color,omitempty"`
+	Align       string       `json:"align,omitempty"`
+	Rotation    float64      `json:"rotation,omitempty"`
+	// arc
+	StartAngle float64 `json:"start_angle,omitempty"`
+	EndAngle   float64 `json:"end_angle,omitempty"`
+	// bezier cubic: control points cp1, cp2
+	CP1X float64 `json:"cp1x,omitempty"`
+	CP1Y float64 `json:"cp1y,omitempty"`
+	CP2X float64 `json:"cp2x,omitempty"`
+	CP2Y float64 `json:"cp2y,omitempty"`
+	// quadratic: single control point
+	CPX float64 `json:"cpx,omitempty"`
+	CPY float64 `json:"cpy,omitempty"`
+	// star
+	OuterR    float64 `json:"outer_r,omitempty"`
+	InnerR    float64 `json:"inner_r,omitempty"`
+	NumPoints int     `json:"num_points,omitempty"`
 }
 
 func RenderDrawing(cfg DrawingConfig) ([]byte, error) {
@@ -85,6 +100,14 @@ func RenderDrawing(cfg DrawingConfig) ([]byte, error) {
 			drawPolygon(dc, el)
 		case "text":
 			drawText(dc, el)
+		case "arc":
+			drawArc(dc, el)
+		case "bezier":
+			drawBezier(dc, el)
+		case "quadratic":
+			drawQuadratic(dc, el)
+		case "star":
+			drawStar(dc, el)
 		}
 		dc.Pop()
 	}
@@ -182,6 +205,54 @@ func drawText(dc *gg.Context, el DrawingElement) {
 	dc.DrawStringAnchored(el.Content, el.X, el.Y, ax, 0.5)
 }
 
+func drawArc(dc *gg.Context, el DrawingElement) {
+	start := gg.Radians(el.StartAngle)
+	end := gg.Radians(el.EndAngle)
+	dc.DrawArc(el.X, el.Y, el.R, start, end)
+	fillAndStroke(dc, el)
+}
+
+func drawBezier(dc *gg.Context, el DrawingElement) {
+	dc.MoveTo(el.X1, el.Y1)
+	dc.CubicTo(el.CP1X, el.CP1Y, el.CP2X, el.CP2Y, el.X2, el.Y2)
+	dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
+	dc.SetLineWidth(strokeWidth(el))
+	dc.Stroke()
+}
+
+func drawQuadratic(dc *gg.Context, el DrawingElement) {
+	dc.MoveTo(el.X1, el.Y1)
+	dc.QuadraticTo(el.CPX, el.CPY, el.X2, el.Y2)
+	dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
+	dc.SetLineWidth(strokeWidth(el))
+	dc.Stroke()
+}
+
+func drawStar(dc *gg.Context, el DrawingElement) {
+	n := el.NumPoints
+	if n < 3 {
+		n = 5
+	}
+	outer := el.OuterR
+	inner := el.InnerR
+	if inner <= 0 {
+		inner = outer * 0.4
+	}
+	angle := -math.Pi / 2
+	step := math.Pi / float64(n)
+	dc.MoveTo(el.X+outer*math.Cos(angle), el.Y+outer*math.Sin(angle))
+	for i := 1; i < n*2; i++ {
+		angle += step
+		r := outer
+		if i%2 == 1 {
+			r = inner
+		}
+		dc.LineTo(el.X+r*math.Cos(angle), el.Y+r*math.Sin(angle))
+	}
+	dc.ClosePath()
+	fillAndStroke(dc, el)
+}
+
 func fillAndStroke(dc *gg.Context, el DrawingElement) {
 	if el.Fill != "" && el.Stroke != "" {
 		dc.SetColor(parseColor(el.Fill, color.RGBA{255, 255, 255, 255}))
@@ -214,8 +285,10 @@ func elementCenter(el DrawingElement) (float64, float64) {
 		return el.X, el.Y
 	case "ellipse":
 		return el.X, el.Y
-	case "line":
+	case "line", "bezier", "quadratic":
 		return (el.X1 + el.X2) / 2, (el.Y1 + el.Y2) / 2
+	case "arc", "star":
+		return el.X, el.Y
 	case "polygon":
 		if len(el.Points) == 0 {
 			return 0, 0

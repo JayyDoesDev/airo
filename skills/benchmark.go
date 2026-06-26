@@ -105,7 +105,12 @@ func RunBenchmark(cfg BenchmarkConfig) ([]BenchmarkResult, error) {
 		}
 
 		nsPerOp := make([]float64, steps)
-		params := make(map[string]interface{}, 1)
+		params := make(map[string]interface{})
+		for _, v := range compiled.Vars() {
+			if v != variable {
+				params[v] = 1.0
+			}
+		}
 
 		for i, xVal := range xValues {
 			params[variable] = xVal
