@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -13,6 +14,11 @@ import (
 	"github.com/jayydoesdev/airo/bot/skills"
 	"github.com/jayydoesdev/airo/bot/skills/actions"
 	taskqueue "github.com/jayydoesdev/airo/bot/tasks"
+)
+
+var (
+	lastDrawing   = map[string]*skills.DrawingConfig{}
+	lastDrawingMu sync.RWMutex
 )
 
 func HandleMentions(id string) (string, string) {
@@ -87,7 +93,18 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		userVoiceChannelID = voiceChannelID
 	}
 
-	fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + primeAdmin + "\n\nUser says: " + content
+	lastDrawingMu.RLock()
+	prevDrawing := lastDrawing[m.ChannelID]
+	lastDrawingMu.RUnlock()
+
+	prevDrawingContext := ""
+	if prevDrawing != nil {
+		if b, err := json.Marshal(prevDrawing); err == nil {
+			prevDrawingContext = "\n\nPrevious drawing:\n" + string(b)
+		}
+	}
+
+	fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + primeAdmin + "\n\nUser says: " + content + prevDrawingContext
 
 	resp, err := client.Send(m.Author.ID, m.Author.Username, *guild, fullPrompt, mem)
 	if err != nil {
@@ -390,6 +407,10 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if err != nil {
 			fmt.Println("[drawing] render error:", err)
 			drawingPNG = nil
+		} else {
+			lastDrawingMu.Lock()
+			lastDrawing[m.ChannelID] = drawingCfg
+			lastDrawingMu.Unlock()
 		}
 	}
 

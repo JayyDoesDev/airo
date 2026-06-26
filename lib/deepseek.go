@@ -60,17 +60,7 @@ func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.G
 			break
 		}
 		if attempt == 2 {
-			errMsg := err.Error()
-			const prefix = "message: "
-			idx := strings.Index(errMsg, prefix)
-			if idx != -1 {
-				msg := errMsg[idx+len(prefix):]
-				if commaIdx := strings.Index(msg, ","); commaIdx != -1 {
-					msg = msg[:commaIdx]
-				}
-				return "", errors.New(strings.TrimSpace(msg))
-			}
-			return "", err
+			return "", extractAPIError(err)
 		}
 	}
 
@@ -84,6 +74,20 @@ func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.G
 	}
 
 	return ds.Response, nil
+}
+
+func extractAPIError(err error) error {
+	errMsg := err.Error()
+	const prefix = "message: "
+	idx := strings.Index(errMsg, prefix)
+	if idx != -1 {
+		msg := errMsg[idx+len(prefix):]
+		if commaIdx := strings.Index(msg, ","); commaIdx != -1 {
+			msg = msg[:commaIdx]
+		}
+		return errors.New(strings.TrimSpace(msg))
+	}
+	return err
 }
 
 func (ds *DeepSeek) Message() string {
