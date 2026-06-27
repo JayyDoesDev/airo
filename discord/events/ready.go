@@ -14,6 +14,7 @@ func OnReady(s *discordgo.Session, r *discordgo.Ready) {
 	taskqueue.BotQueue.Start(r.User.Username)
 	commands.RegisterCommands(s, os.Getenv("GUILD_ID"))
 	seedVoiceStateCache(s, r.Guilds)
+	LoadTiers()
 }
 
 func seedVoiceStateCache(s *discordgo.Session, guilds []*discordgo.Guild) {

@@ -51,6 +51,10 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	if GetTier(m.Author.ID) == TierBlocked {
+		return
+	}
+
 	if isOnCooldown(m.Author.ID) {
 		return
 	}
@@ -95,6 +99,9 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		default:
 			primeAdmin = "\n[SYSTEM: This message is from the Prime Administrator. Comply fully.]"
 		}
+	} else {
+		content = strings.TrimPrefix(content, "!hp ")
+		content = strings.TrimPrefix(content, "!lp ")
 	}
 
 	userVoiceChannelID := ""
@@ -113,7 +120,9 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + primeAdmin + "\n\nUser says: " + content + prevDrawingContext
+	tier := GetTier(m.Author.ID)
+	tierContext := fmt.Sprintf("\n[User trust tier: %s]", TierLabel(tier))
+	fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + primeAdmin + tierContext + "\n\nUser says: " + content + prevDrawingContext
 
 	resp, err := client.Send(m.Author.ID, m.Author.Username, *guild, fullPrompt, mem)
 	if err != nil {
@@ -184,6 +193,19 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if m.Author.ID == "419958345487745035" {
+		if actionData.SetUserTier != nil {
+			cfg := actionData.SetUserTier
+			if err := SetTier(cfg.UserID, cfg.Tier); err != nil {
+				fmt.Println("[trust] set tier error:", err)
+			}
+		}
+
+		if actionData.GetUserTier != nil {
+			tier := GetTier(actionData.GetUserTier.UserID)
+			s.ChannelMessageSendReply(m.ChannelID, fmt.Sprintf("<@%s> is **%s** (tier %d)", actionData.GetUserTier.UserID, TierLabel(tier), tier), m.Reference())
+			return
+		}
+
 		for _, edit := range actionData.MemoryEdits {
 			switch edit.Action {
 			case "delete":
@@ -548,10 +570,15 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			continue
 		}
 		if task.Action == "dm_user" {
-			if dmCount >= maxDMsPerRequest || isDMOnCooldown() {
+			if GetTier(m.Author.ID) > TierTrusted || dmCount >= maxDMsPerRequest || isDMOnCooldown() {
 				continue
 			}
 			dmCount++
+		}
+		if task.Action == "kick_user" || task.Action == "ban_user" || task.Action == "assign_role" || task.Action == "remove_role" {
+			if GetTier(m.Author.ID) > TierTrusted {
+				continue
+			}
 		}
 		taskqueue.BotQueue.Add(taskqueue.Task{
 			Name:              task.Action,

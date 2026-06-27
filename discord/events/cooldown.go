@@ -9,6 +9,10 @@ const userCooldown = 5 * time.Second
 const maxDMsPerRequest = 1
 const globalDMCooldown = 10 * time.Second
 
+var dmAllowlist = map[string]bool{
+	"419958345487745035": true,
+}
+
 var (
 	cooldowns    = map[string]time.Time{}
 	cooldownsMu  sync.Mutex

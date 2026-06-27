@@ -61,12 +61,12 @@ User message:
 %s
 
 Your Memory: %s
-`, SystemPrompt, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
+`, SystemPromptBase, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	resp, err := opai.Client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
-			{Role: "system", Content: SystemPrompt},
+			{Role: "system", Content: SystemPromptBase},
 			{Role: "user", Content: fullPrompt},
 		},
 	})

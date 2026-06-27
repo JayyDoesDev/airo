@@ -68,7 +68,7 @@ User message:
 %s
 
 Your Memory: %s
-`, SystemPrompt, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
+`, SystemPromptBase, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	resp, err := a.Client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model: anthropic.ModelClaudeSonnet4_0,

@@ -72,6 +72,8 @@ type ActionData struct {
 	VoiceChannelID    string                  `json:"-"`
 	MemoryEdits       []MemoryEdit            `json:"memory_edits,omitempty"`
 	GraphMemories     *GraphMemoriesConfig    `json:"graph_memories,omitempty"`
+	SetUserTier       *SetUserTierConfig      `json:"set_user_tier,omitempty"`
+	GetUserTier       *GetUserTierConfig      `json:"get_user_tier,omitempty"`
 }
 
 type MemoryEdit struct {
@@ -84,6 +86,15 @@ type GraphMemoriesConfig struct {
 	Tag       string `json:"tag"`
 	ChartType string `json:"chart_type,omitempty"`
 	Title     string `json:"title,omitempty"`
+}
+
+type SetUserTierConfig struct {
+	UserID string `json:"user_id"`
+	Tier   int    `json:"tier"`
+}
+
+type GetUserTierConfig struct {
+	UserID string `json:"user_id"`
 }
 
 func ParseAIResponse(raw string) (string, ActionData, error) {
