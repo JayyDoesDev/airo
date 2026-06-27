@@ -103,7 +103,9 @@ func formatMemory(mem actions.Memory) string {
 	if len(mem.LongTerm) > 0 {
 		sb.WriteString("\n[long]")
 		for _, m := range mem.LongTerm {
-			sb.WriteString("\n- ")
+			sb.WriteString("\n- [")
+			sb.WriteString(m.Id)
+			sb.WriteString("] ")
 			sb.WriteString(m.Title)
 			sb.WriteString(": ")
 			sb.WriteString(m.Content)
@@ -112,7 +114,9 @@ func formatMemory(mem actions.Memory) string {
 	if len(mem.ShortTerm) > 0 {
 		sb.WriteString("\n[recent]")
 		for _, m := range mem.ShortTerm {
-			sb.WriteString("\n- ")
+			sb.WriteString("\n- [")
+			sb.WriteString(m.Id)
+			sb.WriteString("] ")
 			sb.WriteString(m.Title)
 			sb.WriteString(": ")
 			sb.WriteString(m.Content)

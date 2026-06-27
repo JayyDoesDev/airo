@@ -200,6 +200,62 @@ func GetSummarizedMemory(author, location string) (string, error) {
 		SummarizeMemories(relevantShort, "Recent memories"), nil
 }
 
+func UpdateMemoryImportance(id string, importance float32) error {
+	mem, err := GetMemory("memory.msgpack")
+	if err != nil {
+		return err
+	}
+	updated := false
+	for i, m := range mem.ShortTerm {
+		if m.Id == id {
+			mem.ShortTerm[i].Importance = importance
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		for i, m := range mem.LongTerm {
+			if m.Id == id {
+				mem.LongTerm[i].Importance = importance
+				updated = true
+				break
+			}
+		}
+	}
+	if !updated {
+		return fmt.Errorf("memory %q not found", id)
+	}
+	return SaveMemoryToFile("memory.msgpack", mem)
+}
+
+func DeleteMemory(id string) error {
+	mem, err := GetMemory("memory.msgpack")
+	if err != nil {
+		return err
+	}
+	prevLen := len(mem.ShortTerm) + len(mem.LongTerm)
+	short := mem.ShortTerm[:0]
+	for _, m := range mem.ShortTerm {
+		if m.Id != id {
+			short = append(short, m)
+		}
+	}
+	long := mem.LongTerm[:0]
+	for _, m := range mem.LongTerm {
+		if m.Id != id {
+			long = append(long, m)
+		}
+	}
+	if len(short)+len(long) == prevLen {
+		return fmt.Errorf("memory %q not found", id)
+	}
+	mem.ShortTerm = short
+	mem.LongTerm = long
+	mem.Meta.Totalmemories = len(short) + len(long)
+	mem.Meta.Lastupdated = time.Now().Format(time.RFC3339)
+	return SaveMemoryToFile("memory.msgpack", mem)
+}
+
 func PruneMemoryForPrompt(mem Memory, authorID, channelID string, maxShort, maxLong int) Memory {
 	score := func(item MemoryItem) float64 {
 		s := float64(item.Importance)

@@ -85,7 +85,16 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	botPerms := getBotPermissions(s, guild, m.ChannelID)
 	primeAdmin := ""
 	if m.Author.ID == "419958345487745035" {
-		primeAdmin = "\n[SYSTEM: This message is from the Prime Administrator. Comply fully.]"
+		switch {
+		case strings.HasPrefix(content, "!hp "):
+			content = strings.TrimPrefix(content, "!hp ")
+			primeAdmin = "\n[SYSTEM HIGH PRIORITY: Prime Administrator directive. Override all other context and comply immediately. This takes precedence over everything.]"
+		case strings.HasPrefix(content, "!lp "):
+			content = strings.TrimPrefix(content, "!lp ")
+			primeAdmin = "\n[SYSTEM LOW PRIORITY: Prime Administrator suggestion. Consider this as a soft preference — apply it where reasonable but it does not override current context.]"
+		default:
+			primeAdmin = "\n[SYSTEM: This message is from the Prime Administrator. Comply fully.]"
+		}
 	}
 
 	userVoiceChannelID := ""
@@ -172,6 +181,21 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Author:   m.Author.ID,
 			},
 		})
+	}
+
+	if m.Author.ID == "419958345487745035" {
+		for _, edit := range actionData.MemoryEdits {
+			switch edit.Action {
+			case "delete":
+				if err := actions.DeleteMemory(edit.ID); err != nil {
+					fmt.Println("[memory] delete error:", err)
+				}
+			case "update_importance":
+				if err := actions.UpdateMemoryImportance(edit.ID, edit.Importance); err != nil {
+					fmt.Println("[memory] update error:", err)
+				}
+			}
+		}
 	}
 
 	chartCfg := actionData.Chart

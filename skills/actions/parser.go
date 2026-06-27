@@ -69,6 +69,13 @@ type ActionData struct {
 	ActivityText      string                  `json:"activity_text,omitempty"`
 	SpeakContent      string                  `json:"speak_content,omitempty"`
 	VoiceChannelID    string                  `json:"-"`
+	MemoryEdits       []MemoryEdit            `json:"memory_edits,omitempty"`
+}
+
+type MemoryEdit struct {
+	ID         string  `json:"id"`
+	Action     string  `json:"action"`
+	Importance float32 `json:"importance,omitempty"`
 }
 
 func ParseAIResponse(raw string) (string, ActionData, error) {
