@@ -36,6 +36,7 @@ type Action struct {
 	ActivityText      string                    `json:"activity_text,omitempty"`
 	SpeakContent      string                    `json:"speak_content,omitempty"`
 	VoiceChannelID    string                    `json:"-"`
+	GraphMemories     *GraphMemoriesConfig      `json:"graph_memories,omitempty"`
 }
 
 type ActionData struct {
@@ -70,12 +71,19 @@ type ActionData struct {
 	SpeakContent      string                  `json:"speak_content,omitempty"`
 	VoiceChannelID    string                  `json:"-"`
 	MemoryEdits       []MemoryEdit            `json:"memory_edits,omitempty"`
+	GraphMemories     *GraphMemoriesConfig    `json:"graph_memories,omitempty"`
 }
 
 type MemoryEdit struct {
 	ID         string  `json:"id"`
 	Action     string  `json:"action"`
 	Importance float32 `json:"importance,omitempty"`
+}
+
+type GraphMemoriesConfig struct {
+	Tag       string `json:"tag"`
+	ChartType string `json:"chart_type,omitempty"`
+	Title     string `json:"title,omitempty"`
 }
 
 func ParseAIResponse(raw string) (string, ActionData, error) {

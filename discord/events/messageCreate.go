@@ -196,6 +196,70 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				}
 			}
 		}
+
+		if actionData.Action == "graph_memories" && actionData.GraphMemories != nil {
+			cfg := actionData.GraphMemories
+			items, err := actions.QueryMemoriesByTag(cfg.Tag)
+			if err != nil || len(items) == 0 {
+				msg := "no memories found with tag: " + cfg.Tag
+				if err != nil {
+					msg = "error querying memories: " + err.Error()
+				}
+				s.ChannelMessageSendReply(m.ChannelID, msg, m.Reference())
+				return
+			}
+			labels := make([]string, len(items))
+			values := make([]float64, len(items))
+			for i, item := range items {
+				labels[i] = item.Title
+				values[i] = *item.Value
+			}
+			chartType := cfg.ChartType
+			if chartType == "" {
+				chartType = "bar"
+			}
+			title := cfg.Title
+			if title == "" {
+				title = "Memory data: " + cfg.Tag
+			}
+			chartCfg := skills.ChartConfig{
+				Type:    chartType,
+				Title:   title,
+				XLabels: labels,
+				Datasets: []skills.ChartDataset{{
+					Name:   cfg.Tag,
+					Values: values,
+				}},
+			}
+			png, err := skills.RenderChart(chartCfg)
+			if err != nil {
+				s.ChannelMessageSendReply(m.ChannelID, "chart render error: "+err.Error(), m.Reference())
+				return
+			}
+			s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+				Embeds: []*discordgo.MessageEmbed{{
+					Title: title,
+					Image: &discordgo.MessageEmbedImage{URL: "attachment://memory_graph.png"},
+					Color: 0xFF69B4,
+				}},
+				Files:     []*discordgo.File{{Name: "memory_graph.png", Reader: bytes.NewReader(png)}},
+				Reference: m.Reference(),
+			})
+			return
+		}
+
+		if actionData.Action == "list_memories" {
+			fullMem, err := actions.GetMemory("memory.msgpack")
+			if err != nil {
+				s.ChannelMessageSendReply(m.ChannelID, "failed to read memory: "+err.Error(), m.Reference())
+				return
+			}
+			s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+				Embeds:    buildMemoryEmbeds(fullMem),
+				Reference: m.Reference(),
+			})
+			return
+		}
 	}
 
 	chartCfg := actionData.Chart
@@ -575,6 +639,41 @@ func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.R
 	}
 
 	return embeds, files
+}
+
+func buildMemoryEmbeds(mem actions.Memory) []*discordgo.MessageEmbed {
+	format := func(items []actions.MemoryItem) string {
+		if len(items) == 0 {
+			return "none"
+		}
+		var sb strings.Builder
+		for _, m := range items {
+			sb.WriteString(fmt.Sprintf("`%s` **%s** (%.2f)\n%s\n\n", m.Id, m.Title, m.Importance, m.Content))
+		}
+		return sb.String()
+	}
+
+	long := format(mem.LongTerm)
+	short := format(mem.ShortTerm)
+
+	if len(long) > 4000 {
+		long = long[:4000] + "…"
+	}
+	if len(short) > 4000 {
+		short = short[:4000] + "…"
+	}
+
+	return []*discordgo.MessageEmbed{
+		{
+			Title:       fmt.Sprintf("Memory — %d total", mem.Meta.Totalmemories),
+			Description: "**Long-term**\n" + long,
+			Color:       0xFF69B4,
+		},
+		{
+			Description: "**Short-term**\n" + short,
+			Color:       0xFF69B4,
+		},
+	}
 }
 
 func MakeExecute(task actions.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {

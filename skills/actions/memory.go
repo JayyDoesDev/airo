@@ -30,6 +30,8 @@ type MemoryItem struct {
 	Lastaccessed string             `msgpack:"lastAccessed"`
 	Related      []string           `msgpack:"related,omitempty"`
 	Context      *MemoryItemContext `msgpack:"context"`
+	Value        *float64           `msgpack:"value,omitempty"`
+	Tag          string             `msgpack:"tag,omitempty"`
 }
 
 type MemoryItemContext struct {
@@ -198,6 +200,25 @@ func GetSummarizedMemory(author, location string) (string, error) {
 
 	return SummarizeMemories(relevantLong, "Long-term memories") + "\n" +
 		SummarizeMemories(relevantShort, "Recent memories"), nil
+}
+
+func QueryMemoriesByTag(tag string) ([]MemoryItem, error) {
+	mem, err := GetMemory("memory.msgpack")
+	if err != nil {
+		return nil, err
+	}
+	var results []MemoryItem
+	for _, m := range mem.LongTerm {
+		if m.Tag == tag && m.Value != nil {
+			results = append(results, m)
+		}
+	}
+	for _, m := range mem.ShortTerm {
+		if m.Tag == tag && m.Value != nil {
+			results = append(results, m)
+		}
+	}
+	return results, nil
 }
 
 func UpdateMemoryImportance(id string, importance float32) error {
