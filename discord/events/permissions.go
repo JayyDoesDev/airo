@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	botMemberCache   = map[string]*discordgo.Member{}
-	botMemberCacheMu sync.Mutex
+	botMemberCache		= map[string]*discordgo.Member{}
+	botMemberCacheMu	sync.Mutex
 
-	voiceStateCache   = map[string]string{} // "guildID:userID" -> channelID
-	voiceStateCacheMu sync.RWMutex
+	voiceStateCache		= map[string]string{}	// "guildID:userID" -> channelID
+	voiceStateCacheMu	sync.RWMutex
 )
 
 func OnVoiceStateUpdate(_ *discordgo.Session, v *discordgo.VoiceStateUpdate) {
@@ -122,8 +122,8 @@ func resolveUserVoiceChannel(_ *discordgo.Session, guildID, userID string) (stri
 
 func formatPermissions(perms int64) string {
 	type perm struct {
-		bit  int64
-		name string
+		bit	int64
+		name	string
 	}
 	all := []perm{
 		{discordgo.PermissionAdministrator, "Administrator"},

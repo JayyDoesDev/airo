@@ -8,16 +8,16 @@ import (
 )
 
 type SolverConfig struct {
-	Equation   string  `json:"equation"`
-	Variable   string  `json:"variable"`
-	RangeStart float64 `json:"range_start"`
-	RangeEnd   float64 `json:"range_end"`
-	Theme      string  `json:"theme,omitempty"`
+	Equation	string	`json:"equation"`
+	Variable	string	`json:"variable"`
+	RangeStart	float64	`json:"range_start"`
+	RangeEnd	float64	`json:"range_end"`
+	Theme		string	`json:"theme,omitempty"`
 }
 
 type SolverResult struct {
-	Roots []float64
-	Chart ChartConfig
+	Roots	[]float64
+	Chart	ChartConfig
 }
 
 func SolveEquation(cfg SolverConfig) (SolverResult, error) {
@@ -79,13 +79,13 @@ func SolveEquation(cfg SolverConfig) (SolverResult, error) {
 	}
 
 	chart := ChartConfig{
-		Type:     "line",
-		Title:    "f(" + variable + ") = " + cfg.Equation,
-		XLabels:  xLabels,
-		Datasets: datasets,
-		Width:    1400,
-		Height:   700,
-		Theme:    theme,
+		Type:		"line",
+		Title:		"f(" + variable + ") = " + cfg.Equation,
+		XLabels:	xLabels,
+		Datasets:	datasets,
+		Width:		1400,
+		Height:		700,
+		Theme:		theme,
 	}
 
 	return SolverResult{Roots: roots, Chart: chart}, nil

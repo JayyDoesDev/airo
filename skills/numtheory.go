@@ -7,16 +7,16 @@ import (
 )
 
 type NumberTheoryConfig struct {
-	Operation string    `json:"operation"`
-	Numbers   []int64   `json:"numbers"`
-	RangeEnd  int64     `json:"range_end,omitempty"`
+	Operation	string	`json:"operation"`
+	Numbers		[]int64	`json:"numbers"`
+	RangeEnd	int64	`json:"range_end,omitempty"`
 }
 
 type NumberTheoryResult struct {
-	Operation string
-	Input     []int64
-	Output    string
-	Extra     map[string]interface{}
+	Operation	string
+	Input		[]int64
+	Output		string
+	Extra		map[string]interface{}
 }
 
 func RunNumberTheory(cfg NumberTheoryConfig) (NumberTheoryResult, error) {

@@ -7,15 +7,15 @@ import (
 )
 
 type MatrixConfig struct {
-	Operation string      `json:"operation"`
-	MatrixA   [][]float64 `json:"matrix_a"`
-	MatrixB   [][]float64 `json:"matrix_b,omitempty"`
-	Scalar    float64     `json:"scalar,omitempty"`
+	Operation	string		`json:"operation"`
+	MatrixA		[][]float64	`json:"matrix_a"`
+	MatrixB		[][]float64	`json:"matrix_b,omitempty"`
+	Scalar		float64		`json:"scalar,omitempty"`
 }
 
 type MatrixResult struct {
-	Output     string
-	LatexExprs []LatexExpr
+	Output		string
+	LatexExprs	[]LatexExpr
 }
 
 func RunMatrix(cfg MatrixConfig) (MatrixResult, error) {

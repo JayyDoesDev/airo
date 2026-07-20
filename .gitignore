@@ -11,6 +11,11 @@ temp/cache/
 latestthread.json
 latestvideo.json
 lib/prompts.go
+lib/prompts_academic.go
+lib/injection.go
+polls.json
+reminders.json
+memory.msgpack
 airo
 # User-specific files
 *.rsuser

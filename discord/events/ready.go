@@ -3,18 +3,26 @@ package events
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jayydoesdev/airo/bot/discord/commands"
+	"github.com/jayydoesdev/airo/bot/skills/reminders"
 	taskqueue "github.com/jayydoesdev/airo/bot/tasks"
 )
 
 func OnReady(s *discordgo.Session, r *discordgo.Ready) {
+	taskqueue.StartTime = time.Now()
 	fmt.Println(r.User.Username + " is now online!")
 	taskqueue.BotQueue.Start(r.User.Username)
-	commands.RegisterCommands(s, os.Getenv("GUILD_ID"))
+	if err := commands.RegisterCommands(s, os.Getenv("GUILD_ID")); err != nil {
+		fmt.Println("[commands] registration failed:", err)
+	} else {
+		fmt.Println("[commands] registered successfully, guild:", os.Getenv("GUILD_ID"))
+	}
 	seedVoiceStateCache(s, r.Guilds)
 	LoadTiers()
+	reminders.Start(s)
 }
 
 func seedVoiceStateCache(s *discordgo.Session, guilds []*discordgo.Guild) {

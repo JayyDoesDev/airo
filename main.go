@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/jayydoesdev/airo/bot/discord"
+	"github.com/jayydoesdev/airo/bot/lib"
 	"github.com/jayydoesdev/airo/bot/skills/actions"
 	"github.com/joho/godotenv"
 )
@@ -14,6 +15,8 @@ func main() {
 	if err != nil {
 		log.Println("Couldn't find .env file")
 	}
+
+	lib.AcademicMode = os.Getenv("BOT_PERSONA") == "academic"
 
 	go actions.PurgeAndStoreShortTermMemory()
 

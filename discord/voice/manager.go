@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	mu          sync.Mutex
-	connections = map[string]*discordgo.VoiceConnection{}
+	mu		sync.Mutex
+	connections	= map[string]*discordgo.VoiceConnection{}
 )
 
 func Join(s *discordgo.Session, guildID, channelID string) (*discordgo.VoiceConnection, error) {

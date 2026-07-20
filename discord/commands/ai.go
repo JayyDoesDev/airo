@@ -12,24 +12,24 @@ import (
 var (
 	PromptCommand = Command{
 		ApplicationCommand: &discordgo.ApplicationCommand{
-			Name:        "prompt",
-			Description: "Ask Airo a question!",
+			Name:		"prompt",
+			Description:	"Ask Airo a question!",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Name:        "provider",
-					Description: "Choose the AI provider you would like to use!",
-					Type:        discordgo.ApplicationCommandOptionString,
-					Required:    true,
+					Name:		"provider",
+					Description:	"Choose the AI provider you would like to use!",
+					Type:		discordgo.ApplicationCommandOptionString,
+					Required:	true,
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
 						{Name: "OpenAI", Value: "openai"},
 						{Name: "Anthropic", Value: "anthropic"},
 					},
 				},
 				{
-					Name:        "question",
-					Description: "The prompt to ask the AI",
-					Type:        discordgo.ApplicationCommandOptionString,
-					Required:    true,
+					Name:		"question",
+					Description:	"The prompt to ask the AI",
+					Type:		discordgo.ApplicationCommandOptionString,
+					Required:	true,
 				},
 			},
 		},
@@ -80,10 +80,10 @@ var (
 
 			content := fmt.Sprintf("You chose **%s** and asked:\n> %s\n\n**Response:**\n%s", provider, question, resp)
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Type:	discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: content,
-					Flags:   discordgo.MessageFlagsEphemeral,
+					Content:	content,
+					Flags:		discordgo.MessageFlagsEphemeral,
 				},
 			})
 		},

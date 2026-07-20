@@ -11,21 +11,19 @@ import (
 )
 
 type PixelArtConfig struct {
-	Scale   int        `json:"scale"`
-	Grid    PixelGrid  `json:"grid"`
-	Palette []string   `json:"palette,omitempty"`
+	Scale	int		`json:"scale"`
+	Grid	PixelGrid	`json:"grid"`
+	Palette	[]string	`json:"palette,omitempty"`
 }
 
 type PixelGrid [][]string
 
 func (g *PixelGrid) UnmarshalJSON(data []byte) error {
-	// try [][]string first
 	var grid2d [][]string
 	if err := json.Unmarshal(data, &grid2d); err == nil {
 		*g = grid2d
 		return nil
 	}
-	// fall back to []string — split each row into individual characters
 	var rows []string
 	if err := json.Unmarshal(data, &rows); err != nil {
 		return err
@@ -80,12 +78,12 @@ func RenderPixelArt(cfg PixelArtConfig) ([]byte, error) {
 			var c color.Color
 			if len(cfg.Palette) > 0 {
 				if idx := paletteIndex(cell); idx >= 0 && idx < len(cfg.Palette) {
-					c = parseColor(cfg.Palette[idx], color.RGBA{0, 0, 0, 0})
+					c = parseColorRGBA(cfg.Palette[idx], color.RGBA{0, 0, 0, 0})
 				} else {
-					c = parseColor(cell, color.RGBA{0, 0, 0, 0})
+					c = parseColorRGBA(cell, color.RGBA{0, 0, 0, 0})
 				}
 			} else {
-				c = parseColor(cell, color.RGBA{0, 0, 0, 0})
+				c = parseColorRGBA(cell, color.RGBA{0, 0, 0, 0})
 			}
 
 			r32, g32, b32, a32 := c.RGBA()

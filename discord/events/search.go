@@ -15,17 +15,21 @@ import (
 const searchTrigger = `SEARCH("`
 
 type SearchOpts struct {
-	Response   string
-	Client     lib.LibClient
-	FullPrompt string
-	Memory     actions.Memory
-	Session    *discordgo.Session
-	Message    *discordgo.MessageCreate
-	Guild      *discordgo.Guild
+	Response	string
+	Client		lib.LibClient
+	FullPrompt	string
+	Memory		actions.Memory
+	Session		*discordgo.Session
+	Message		*discordgo.MessageCreate
+	Guild		*discordgo.Guild
 }
 
 func HandleSearch(opts SearchOpts) (string, bool, []skills.References) {
 	if !strings.Contains(opts.Response, searchTrigger) {
+		return opts.Response, false, nil
+	}
+	if isSearchRateLimited() {
+		opts.Session.ChannelMessageSendReply(opts.Message.ChannelID, "Search is busy right now, try again in a moment.", opts.Message.Reference())
 		return opts.Response, false, nil
 	}
 
@@ -35,8 +39,8 @@ func HandleSearch(opts SearchOpts) (string, bool, []skills.References) {
 
 	limit, _ := strconv.Atoi(os.Getenv("EXA_RESULT_LIMIT"))
 	exa := &skills.Exa{
-		API_KEY: os.Getenv("EXA_API_KEY"),
-		Limit:   limit,
+		API_KEY:	os.Getenv("EXA_API_KEY"),
+		Limit:		limit,
 	}
 
 	results, err := exa.Query(q)
@@ -92,11 +96,11 @@ func HandleSearch(opts SearchOpts) (string, bool, []skills.References) {
 
 func SearchEmbed(description string, title, thumbnail, image string) *discordgo.MessageEmbed {
 	embed := &discordgo.MessageEmbed{
-		Description: description,
-		Color:       0x1A1A2E,
+		Description:	description,
+		Color:		0x1A1A2E,
 		Footer: &discordgo.MessageEmbedFooter{
-			Text:    "Search results powered by Exa",
-			IconURL: "https://exa.ai/favicon.ico",
+			Text:		"Search results powered by Exa",
+			IconURL:	"https://exa.ai/favicon.ico",
 		},
 	}
 	if title != "" {
@@ -114,9 +118,9 @@ func SearchEmbed(description string, title, thumbnail, image string) *discordgo.
 func SearchReferencesEmbed(refs []skills.References) *discordgo.MessageEmbed {
 	if len(refs) == 0 {
 		return &discordgo.MessageEmbed{
-			Title:       "No Results Found",
-			Description: "Exa returned no usable search results.",
-			Color:       0x1A1A2E,
+			Title:		"No Results Found",
+			Description:	"Exa returned no usable search results.",
+			Color:		0x1A1A2E,
 		}
 	}
 
@@ -130,12 +134,12 @@ func SearchReferencesEmbed(refs []skills.References) *discordgo.MessageEmbed {
 	}
 
 	return &discordgo.MessageEmbed{
-		Title:       "🔎 References",
-		Description: desc.String(),
-		Color:       0x1A1A2E,
+		Title:		"🔎 References",
+		Description:	desc.String(),
+		Color:		0x1A1A2E,
 		Footer: &discordgo.MessageEmbedFooter{
-			Text:    "Search results powered by Exa",
-			IconURL: "https://exa.ai/favicon.ico",
+			Text:		"Search results powered by Exa",
+			IconURL:	"https://exa.ai/favicon.ico",
 		},
 	}
 }

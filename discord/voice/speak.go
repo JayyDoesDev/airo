@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	sampleRate  = 48000
-	channels    = 2
-	frameSizems = 20
-	frameSize   = sampleRate * frameSizems / 1000
+	sampleRate	= 48000
+	channels	= 2
+	frameSizems	= 20
+	frameSize	= sampleRate * frameSizems / 1000
 )
 
 func Speak(vc *discordgo.VoiceConnection, text string) error {

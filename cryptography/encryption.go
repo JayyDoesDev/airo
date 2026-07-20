@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	aesKey []byte
-	once   sync.Once
+	aesKey	[]byte
+	once	sync.Once
 )
 
 func GetAESKey() []byte {

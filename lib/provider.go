@@ -8,7 +8,7 @@ import (
 )
 
 type LibClient interface {
-	Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error)
+	Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory, extraContext ...string) (string, error)
 	Message() string
 }
 
@@ -23,4 +23,8 @@ func NewClient(provider string, token string) (LibClient, error) {
 	default:
 		return nil, errors.New("this provider is not supported")
 	}
+}
+
+func EmptyMemory() actions.Memory {
+	return actions.Memory{}
 }

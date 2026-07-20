@@ -14,18 +14,18 @@ import (
 )
 
 type Anthropic struct {
-	Token    string
-	Client   anthropic.Client
-	Prompt   string
-	Response string
+	Token		string
+	Client		anthropic.Client
+	Prompt		string
+	Response	string
 }
 
 func NewAnthropicClient(token string) *Anthropic {
 	client := anthropic.NewClient(option.WithAPIKey(token))
 
 	return &Anthropic{
-		Token:  token,
-		Client: client,
+		Token:	token,
+		Client:	client,
 	}
 }
 
@@ -34,7 +34,7 @@ func (a *Anthropic) SetToken(t string) {
 	a.Client = anthropic.NewClient(option.WithAPIKey(t))
 }
 
-func (a *Anthropic) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
+func (a *Anthropic) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory, extraContext ...string) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")
@@ -71,16 +71,16 @@ Your Memory: %s
 `, SystemPromptBase, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	resp, err := a.Client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model: anthropic.ModelClaudeSonnet4_0,
+		Model:	anthropic.ModelClaudeSonnet4_0,
 		Messages: []anthropic.MessageParam{
 			{
-				Role: anthropic.MessageParamRoleUser,
+				Role:	anthropic.MessageParamRoleUser,
 				Content: []anthropic.ContentBlockParamUnion{
 					anthropic.NewTextBlock(fullPrompt),
 				},
 			},
 		},
-		MaxTokens: 3000,
+		MaxTokens:	3000,
 	})
 	if err != nil {
 		errMsg := err.Error()

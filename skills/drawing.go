@@ -2,20 +2,23 @@ package skills
 
 import (
 	"bytes"
-	"fmt"
+	"image"
+	_ "image/jpeg"
 	"image/color"
 	"image/png"
 	"math"
+	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/fogleman/gg"
+	"github.com/tdewolff/canvas"
+	"github.com/tdewolff/canvas/renderers/rasterizer"
 )
 
 type DrawingConfig struct {
-	Width      int             `json:"width"`
-	Height     int             `json:"height"`
-	Background string          `json:"background"`
+	Width      int              `json:"width"`
+	Height     int              `json:"height"`
+	Background string           `json:"background"`
 	Elements   []DrawingElement `json:"elements"`
 }
 
@@ -42,117 +45,165 @@ type DrawingElement struct {
 	Color       string       `json:"color,omitempty"`
 	Align       string       `json:"align,omitempty"`
 	Rotation    float64      `json:"rotation,omitempty"`
-	// arc
-	StartAngle float64 `json:"start_angle,omitempty"`
-	EndAngle   float64 `json:"end_angle,omitempty"`
-	// bezier cubic: control points cp1, cp2
-	CP1X float64 `json:"cp1x,omitempty"`
-	CP1Y float64 `json:"cp1y,omitempty"`
-	CP2X float64 `json:"cp2x,omitempty"`
-	CP2Y float64 `json:"cp2y,omitempty"`
-	// quadratic: single control point
-	CPX float64 `json:"cpx,omitempty"`
-	CPY float64 `json:"cpy,omitempty"`
-	// star
-	OuterR    float64 `json:"outer_r,omitempty"`
-	InnerR    float64 `json:"inner_r,omitempty"`
-	NumPoints int     `json:"num_points,omitempty"`
+	StartAngle  float64      `json:"start_angle,omitempty"`
+	EndAngle    float64      `json:"end_angle,omitempty"`
+	CP1X        float64      `json:"cp1x,omitempty"`
+	CP1Y        float64      `json:"cp1y,omitempty"`
+	CP2X        float64      `json:"cp2x,omitempty"`
+	CP2Y        float64      `json:"cp2y,omitempty"`
+	CPX         float64      `json:"cpx,omitempty"`
+	CPY         float64      `json:"cpy,omitempty"`
+	OuterR      float64      `json:"outer_r,omitempty"`
+	InnerR      float64      `json:"inner_r,omitempty"`
+	NumPoints   int          `json:"num_points,omitempty"`
+	Label       string       `json:"label,omitempty"`
+	Opacity     float64      `json:"opacity,omitempty"`
+	Gradient    *GradientDef `json:"gradient,omitempty"`
+	D           string       `json:"d,omitempty"`
+	Src         string       `json:"src,omitempty"`
+	Dash        []float64    `json:"dash,omitempty"`
+	LineCap     string       `json:"linecap,omitempty"`
+	LineJoin    string       `json:"linejoin,omitempty"`
+	ScaleX      float64      `json:"scale_x,omitempty"`
+	ScaleY      float64      `json:"scale_y,omitempty"`
+	ShearX      float64      `json:"shear_x,omitempty"`
+	ShearY      float64      `json:"shear_y,omitempty"`
+	TextWidth   float64      `json:"text_width,omitempty"`
 }
 
+type GradientDef struct {
+	Type  string         `json:"type"`
+	X0    float64        `json:"x0,omitempty"`
+	Y0    float64        `json:"y0,omitempty"`
+	X1    float64        `json:"x1,omitempty"`
+	Y1    float64        `json:"y1,omitempty"`
+	R0    float64        `json:"r0,omitempty"`
+	R1    float64        `json:"r1,omitempty"`
+	Stops []GradientStop `json:"stops"`
+}
+
+type GradientStop struct {
+	Offset float64 `json:"offset"`
+	Color  string  `json:"color"`
+}
+
+const dpmm = 5.7
+
 func RenderDrawing(cfg DrawingConfig) ([]byte, error) {
-	w := cfg.Width
-	h := cfg.Height
+	w := float64(cfg.Width)
+	h := float64(cfg.Height)
 	if w <= 0 {
 		w = 800
 	}
 	if h <= 0 {
 		h = 600
 	}
-	if w > 2000 {
-		w = 2000
+	if w > 4000 {
+		w = 4000
 	}
-	if h > 2000 {
-		h = 2000
+	if h > 4000 {
+		h = 4000
 	}
 
-	dc := gg.NewContext(w, h)
+	c := canvas.New(w, h)
+	ctx := canvas.NewContext(c)
 
-	bg := parseColor(cfg.Background, color.RGBA{20, 20, 30, 255})
-	dc.SetColor(bg)
-	dc.Clear()
+	ctx.SetCoordSystem(canvas.CartesianIV)
+
+	bg := parseColorRGBA(cfg.Background, color.RGBA{20, 20, 30, 255})
+	ctx.SetFillColor(bg)
+	ctx.DrawPath(0, 0, canvas.Rectangle(w, h))
 
 	for _, el := range cfg.Elements {
-		dc.Push()
-		if el.Rotation != 0 {
-			cx, cy := elementCenter(el)
-			dc.RotateAbout(gg.Radians(el.Rotation), cx, cy)
-		}
-		switch el.Type {
-		case "rect":
-			drawRect(dc, el)
-		case "circle":
-			drawCircle(dc, el)
-		case "ellipse":
-			drawEllipse(dc, el)
-		case "line":
-			drawLine(dc, el)
-		case "polygon":
-			drawPolygon(dc, el)
-		case "text":
-			drawText(dc, el)
-		case "arc":
-			drawArc(dc, el)
-		case "bezier":
-			drawBezier(dc, el)
-		case "quadratic":
-			drawQuadratic(dc, el)
-		case "star":
-			drawStar(dc, el)
-		}
-		dc.Pop()
+		drawElement(ctx, el, w, h)
 	}
 
+	img := rasterizer.Draw(c, canvas.DPMM(dpmm), canvas.DefaultColorSpace)
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, dc.Image()); err != nil {
-		return nil, fmt.Errorf("png encode: %w", err)
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func drawRect(dc *gg.Context, el DrawingElement) {
-	if el.Fill != "" {
-		dc.SetColor(parseColor(el.Fill, color.RGBA{255, 255, 255, 255}))
-		if el.Radius > 0 {
-			dc.DrawRoundedRectangle(el.X, el.Y, el.W, el.H, el.Radius)
-		} else {
-			dc.DrawRectangle(el.X, el.Y, el.W, el.H)
+func drawElement(ctx *canvas.Context, el DrawingElement, cw, ch float64) {
+	ctx.Push()
+	defer ctx.Pop()
+
+	opacity := el.Opacity
+	if opacity <= 0 || opacity > 1 {
+		opacity = 1
+	}
+
+	cx, cy := elementCenter(el)
+	if el.Rotation != 0 || el.ScaleX != 0 || el.ScaleY != 0 || el.ShearX != 0 || el.ShearY != 0 {
+		ctx.Translate(cx, cy)
+		if el.Rotation != 0 {
+			ctx.Rotate(-el.Rotation)
 		}
-		if el.Stroke != "" {
-			dc.FillPreserve()
-			dc.SetColor(parseColor(el.Stroke, color.RGBA{0, 0, 0, 255}))
-			dc.SetLineWidth(strokeWidth(el))
-			dc.Stroke()
-		} else {
-			dc.Fill()
+		if el.ScaleX != 0 || el.ScaleY != 0 {
+			sx := el.ScaleX
+			if sx == 0 {
+				sx = 1
+			}
+			sy := el.ScaleY
+			if sy == 0 {
+				sy = 1
+			}
+			ctx.Scale(sx, sy)
 		}
-	} else if el.Stroke != "" {
-		dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
-		dc.SetLineWidth(strokeWidth(el))
-		if el.Radius > 0 {
-			dc.DrawRoundedRectangle(el.X, el.Y, el.W, el.H, el.Radius)
-		} else {
-			dc.DrawRectangle(el.X, el.Y, el.W, el.H)
+		if el.ShearX != 0 || el.ShearY != 0 {
+			ctx.Shear(el.ShearX, el.ShearY)
 		}
-		dc.Stroke()
+		ctx.Translate(-cx, -cy)
+	}
+
+	applyStrokeStyle(ctx, el, opacity)
+
+	switch el.Type {
+	case "rect":
+		drawRect(ctx, el, opacity)
+	case "circle":
+		drawCircle(ctx, el, opacity)
+	case "ellipse":
+		drawEllipse(ctx, el, opacity)
+	case "line":
+		drawLine(ctx, el, opacity)
+	case "polygon":
+		drawPolygon(ctx, el, opacity)
+	case "text":
+		drawText(ctx, el, opacity)
+	case "arc":
+		drawArc(ctx, el, opacity)
+	case "bezier":
+		drawBezier(ctx, el, opacity)
+	case "quadratic":
+		drawQuadratic(ctx, el, opacity)
+	case "star":
+		drawStar(ctx, el, opacity)
+	case "path":
+		drawPath(ctx, el, opacity)
+	case "image":
+		drawImage(ctx, el)
 	}
 }
 
-func drawCircle(dc *gg.Context, el DrawingElement) {
-	dc.DrawCircle(el.X, el.Y, el.R)
-	fillAndStroke(dc, el)
+func drawRect(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	var p *canvas.Path
+	if el.Radius > 0 {
+		p = canvas.RoundedRectangle(el.W, el.H, el.Radius)
+	} else {
+		p = canvas.Rectangle(el.W, el.H)
+	}
+	paintPath(ctx, p, el, el.X, el.Y, opacity)
 }
 
-func drawEllipse(dc *gg.Context, el DrawingElement) {
+func drawCircle(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	p := canvas.Circle(el.R)
+	paintPath(ctx, p, el, el.X, el.Y, opacity)
+}
+
+func drawEllipse(ctx *canvas.Context, el DrawingElement, opacity float64) {
 	rx := el.RX
 	ry := el.RY
 	if rx == 0 {
@@ -161,74 +212,116 @@ func drawEllipse(dc *gg.Context, el DrawingElement) {
 	if ry == 0 {
 		ry = el.H / 2
 	}
-	dc.DrawEllipse(el.X, el.Y, rx, ry)
-	fillAndStroke(dc, el)
+	p := canvas.Ellipse(rx, ry)
+	paintPath(ctx, p, el, el.X, el.Y, opacity)
 }
 
-func drawLine(dc *gg.Context, el DrawingElement) {
-	dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
-	dc.SetLineWidth(strokeWidth(el))
-	dc.DrawLine(el.X1, el.Y1, el.X2, el.Y2)
-	dc.Stroke()
+func drawLine(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	p := &canvas.Path{}
+	p.MoveTo(el.X1, el.Y1)
+	p.LineTo(el.X2, el.Y2)
+	sw := el.StrokeWidth
+	if sw <= 0 {
+		sw = 1
+	}
+	ctx.SetStrokeColor(withOpacity(parseColorRGBA(el.Stroke, color.RGBA{255, 255, 255, 255}), opacity))
+	ctx.SetStrokeWidth(sw)
+	ctx.DrawPath(0, 0, p)
 }
 
-func drawPolygon(dc *gg.Context, el DrawingElement) {
+func drawPolygon(ctx *canvas.Context, el DrawingElement, opacity float64) {
 	if len(el.Points) < 2 {
 		return
 	}
-	dc.MoveTo(el.Points[0][0], el.Points[0][1])
-	for _, p := range el.Points[1:] {
-		dc.LineTo(p[0], p[1])
+	p := &canvas.Path{}
+	p.MoveTo(el.Points[0][0], el.Points[0][1])
+	for _, pt := range el.Points[1:] {
+		p.LineTo(pt[0], pt[1])
 	}
-	dc.ClosePath()
-	fillAndStroke(dc, el)
+	p.Close()
+	paintPath(ctx, p, el, 0, 0, opacity)
 }
 
-func drawText(dc *gg.Context, el DrawingElement) {
+func drawText(ctx *canvas.Context, el DrawingElement, opacity float64) {
 	size := el.Size
 	if size <= 0 {
 		size = 16
 	}
-	if err := dc.LoadFontFace("/System/Library/Fonts/Helvetica.ttc", size); err != nil {
-		if err := dc.LoadFontFace("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size); err != nil {
-			dc.LoadFontFace("/usr/share/fonts/dejavu/DejaVuSans.ttf", size)
+
+	face := canvas.NewFontFamily("sans")
+	for _, path := range []string{
+		"/System/Library/Fonts/Helvetica.ttc",
+		"/System/Library/Fonts/SFNSDisplay.ttf",
+		"/System/Library/Fonts/SFNS.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/dejavu/DejaVuSans.ttf",
+	} {
+		if err := face.LoadFontFile(path, canvas.FontRegular); err == nil {
+			break
 		}
 	}
-	dc.SetColor(parseColor(el.Color, color.RGBA{255, 255, 255, 255}))
-	ax := 0.0
+
+	col := parseColorRGBA(el.Color, color.RGBA{255, 255, 255, 255})
+	col = withOpacity(col, opacity)
+
+	ff := face.Face(size, col, canvas.FontRegular, canvas.FontNormal)
+
+	var halign canvas.TextAlign
 	switch strings.ToLower(el.Align) {
 	case "center":
-		ax = 0.5
+		halign = canvas.Center
 	case "right":
-		ax = 1.0
+		halign = canvas.Right
+	default:
+		halign = canvas.Left
 	}
-	dc.DrawStringAnchored(el.Content, el.X, el.Y, ax, 0.5)
+
+	rt := canvas.NewRichText(ff)
+	rt.WriteString(el.Content)
+	w := el.TextWidth
+	if w <= 0 {
+		w = 2000
+	}
+	txt := rt.ToText(w, 0, halign, canvas.Top, nil)
+	ctx.DrawText(el.X, el.Y, txt)
 }
 
-func drawArc(dc *gg.Context, el DrawingElement) {
-	start := gg.Radians(el.StartAngle)
-	end := gg.Radians(el.EndAngle)
-	dc.DrawArc(el.X, el.Y, el.R, start, end)
-	fillAndStroke(dc, el)
+func drawArc(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	p := &canvas.Path{}
+	start := el.StartAngle * math.Pi / 180
+	end := el.EndAngle * math.Pi / 180
+	p.MoveTo(el.X+el.R*math.Cos(start), el.Y+el.R*math.Sin(start))
+	p.Arc(el.R, el.R, 0, start, end)
+	paintPath(ctx, p, el, 0, 0, opacity)
 }
 
-func drawBezier(dc *gg.Context, el DrawingElement) {
-	dc.MoveTo(el.X1, el.Y1)
-	dc.CubicTo(el.CP1X, el.CP1Y, el.CP2X, el.CP2Y, el.X2, el.Y2)
-	dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
-	dc.SetLineWidth(strokeWidth(el))
-	dc.Stroke()
+func drawBezier(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	p := &canvas.Path{}
+	p.MoveTo(el.X1, el.Y1)
+	p.CubeTo(el.CP1X, el.CP1Y, el.CP2X, el.CP2Y, el.X2, el.Y2)
+	sw := el.StrokeWidth
+	if sw <= 0 {
+		sw = 1
+	}
+	ctx.SetStrokeColor(withOpacity(parseColorRGBA(el.Stroke, color.RGBA{255, 255, 255, 255}), opacity))
+	ctx.SetStrokeWidth(sw)
+	ctx.DrawPath(0, 0, p)
 }
 
-func drawQuadratic(dc *gg.Context, el DrawingElement) {
-	dc.MoveTo(el.X1, el.Y1)
-	dc.QuadraticTo(el.CPX, el.CPY, el.X2, el.Y2)
-	dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
-	dc.SetLineWidth(strokeWidth(el))
-	dc.Stroke()
+func drawQuadratic(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	p := &canvas.Path{}
+	p.MoveTo(el.X1, el.Y1)
+	p.QuadTo(el.CPX, el.CPY, el.X2, el.Y2)
+	sw := el.StrokeWidth
+	if sw <= 0 {
+		sw = 1
+	}
+	ctx.SetStrokeColor(withOpacity(parseColorRGBA(el.Stroke, color.RGBA{255, 255, 255, 255}), opacity))
+	ctx.SetStrokeWidth(sw)
+	ctx.DrawPath(0, 0, p)
 }
 
-func drawStar(dc *gg.Context, el DrawingElement) {
+func drawStar(ctx *canvas.Context, el DrawingElement, opacity float64) {
 	n := el.NumPoints
 	if n < 3 {
 		n = 5
@@ -240,55 +333,100 @@ func drawStar(dc *gg.Context, el DrawingElement) {
 	}
 	angle := -math.Pi / 2
 	step := math.Pi / float64(n)
-	dc.MoveTo(el.X+outer*math.Cos(angle), el.Y+outer*math.Sin(angle))
+	p := &canvas.Path{}
+	p.MoveTo(el.X+outer*math.Cos(angle), el.Y+outer*math.Sin(angle))
 	for i := 1; i < n*2; i++ {
 		angle += step
 		r := outer
 		if i%2 == 1 {
 			r = inner
 		}
-		dc.LineTo(el.X+r*math.Cos(angle), el.Y+r*math.Sin(angle))
+		p.LineTo(el.X+r*math.Cos(angle), el.Y+r*math.Sin(angle))
 	}
-	dc.ClosePath()
-	fillAndStroke(dc, el)
+	p.Close()
+	paintPath(ctx, p, el, 0, 0, opacity)
 }
 
-func fillAndStroke(dc *gg.Context, el DrawingElement) {
-	if el.Fill != "" && el.Stroke != "" {
-		dc.SetColor(parseColor(el.Fill, color.RGBA{255, 255, 255, 255}))
-		dc.FillPreserve()
-		dc.SetColor(parseColor(el.Stroke, color.RGBA{0, 0, 0, 255}))
-		dc.SetLineWidth(strokeWidth(el))
-		dc.Stroke()
-	} else if el.Fill != "" {
-		dc.SetColor(parseColor(el.Fill, color.RGBA{255, 255, 255, 255}))
-		dc.Fill()
-	} else if el.Stroke != "" {
-		dc.SetColor(parseColor(el.Stroke, color.RGBA{255, 255, 255, 255}))
-		dc.SetLineWidth(strokeWidth(el))
-		dc.Stroke()
+func drawPath(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	if el.D == "" {
+		return
 	}
+	p, err := canvas.ParseSVGPath(el.D)
+	if err != nil {
+		return
+	}
+	paintPath(ctx, p, el, 0, 0, opacity)
 }
 
-func strokeWidth(el DrawingElement) float64 {
-	if el.StrokeWidth > 0 {
-		return el.StrokeWidth
+func drawImage(ctx *canvas.Context, el DrawingElement) {
+	if el.Src == "" {
+		return
 	}
-	return 1
+	resp, err := http.Get(el.Src)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	img, _, err := image.Decode(resp.Body)
+	if err != nil {
+		return
+	}
+	ctx.DrawImage(el.X, el.Y, img, canvas.DPMM(dpmm))
+}
+
+func paintPath(ctx *canvas.Context, p *canvas.Path, el DrawingElement, ox, oy float64, opacity float64) {
+	hasFill := el.Fill != "" && strings.ToLower(el.Fill) != "none"
+	hasStroke := el.Stroke != "" && strings.ToLower(el.Stroke) != "none"
+
+	sw := el.StrokeWidth
+	if sw <= 0 {
+		sw = 1
+	}
+
+	if hasFill {
+		ctx.SetFillColor(withOpacity(parseColorRGBA(el.Fill, color.RGBA{255, 255, 255, 255}), opacity))
+	} else {
+		ctx.SetFillColor(color.RGBA{0, 0, 0, 0})
+	}
+	if hasStroke {
+		ctx.SetStrokeColor(withOpacity(parseColorRGBA(el.Stroke, color.RGBA{255, 255, 255, 255}), opacity))
+		ctx.SetStrokeWidth(sw)
+	} else {
+		ctx.SetStrokeColor(color.RGBA{0, 0, 0, 0})
+	}
+	ctx.DrawPath(ox, oy, p)
+}
+
+func applyStrokeStyle(ctx *canvas.Context, el DrawingElement, opacity float64) {
+	if len(el.Dash) > 0 {
+		ctx.SetDashes(0, el.Dash...)
+	}
+	switch strings.ToLower(el.LineCap) {
+	case "round":
+		ctx.SetStrokeCapper(canvas.RoundCap)
+	case "square":
+		ctx.SetStrokeCapper(canvas.SquareCap)
+	default:
+		ctx.SetStrokeCapper(canvas.ButtCap)
+	}
+	switch strings.ToLower(el.LineJoin) {
+	case "round":
+		ctx.SetStrokeJoiner(canvas.RoundJoin)
+	case "bevel":
+		ctx.SetStrokeJoiner(canvas.BevelJoin)
+	default:
+		ctx.SetStrokeJoiner(canvas.MiterJoin)
+	}
 }
 
 func elementCenter(el DrawingElement) (float64, float64) {
 	switch el.Type {
 	case "rect":
 		return el.X + el.W/2, el.Y + el.H/2
-	case "circle":
-		return el.X, el.Y
-	case "ellipse":
+	case "circle", "ellipse", "arc", "star":
 		return el.X, el.Y
 	case "line", "bezier", "quadratic":
 		return (el.X1 + el.X2) / 2, (el.Y1 + el.Y2) / 2
-	case "arc", "star":
-		return el.X, el.Y
 	case "polygon":
 		if len(el.Points) == 0 {
 			return 0, 0
@@ -304,8 +442,57 @@ func elementCenter(el DrawingElement) (float64, float64) {
 	return el.X, el.Y
 }
 
-func parseColor(hex string, fallback color.Color) color.Color {
-	hex = strings.TrimPrefix(strings.TrimSpace(hex), "#")
+func parseColorRGBA(hex string, fallback color.RGBA) color.RGBA {
+	hex = strings.TrimSpace(hex)
+
+	switch strings.ToLower(hex) {
+	case "white":
+		return color.RGBA{255, 255, 255, 255}
+	case "black":
+		return color.RGBA{0, 0, 0, 255}
+	case "red":
+		return color.RGBA{255, 0, 0, 255}
+	case "green":
+		return color.RGBA{0, 128, 0, 255}
+	case "blue":
+		return color.RGBA{0, 0, 255, 255}
+	case "yellow":
+		return color.RGBA{255, 255, 0, 255}
+	case "orange":
+		return color.RGBA{255, 165, 0, 255}
+	case "purple":
+		return color.RGBA{128, 0, 128, 255}
+	case "pink":
+		return color.RGBA{255, 192, 203, 255}
+	case "cyan":
+		return color.RGBA{0, 255, 255, 255}
+	case "magenta":
+		return color.RGBA{255, 0, 255, 255}
+	case "gray", "grey":
+		return color.RGBA{128, 128, 128, 255}
+	case "transparent", "none", "":
+		return color.RGBA{0, 0, 0, 0}
+	}
+
+	lower := strings.ToLower(hex)
+	if strings.HasPrefix(lower, "rgb") {
+		inner := strings.TrimPrefix(strings.TrimPrefix(lower, "rgba("), "rgb(")
+		inner = strings.TrimSuffix(inner, ")")
+		parts := strings.Split(inner, ",")
+		if len(parts) >= 3 {
+			r, _ := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+			g, _ := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+			b, _ := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+			a := 255.0
+			if len(parts) == 4 {
+				av, _ := strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
+				a = av * 255
+			}
+			return color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
+		}
+	}
+
+	hex = strings.TrimPrefix(hex, "#")
 	switch len(hex) {
 	case 6:
 		r, _ := strconv.ParseUint(hex[0:2], 16, 8)
@@ -327,4 +514,10 @@ func parseColor(hex string, fallback color.Color) color.Color {
 	return fallback
 }
 
-var _ = math.Pi
+func withOpacity(c color.RGBA, opacity float64) color.RGBA {
+	if opacity <= 0 || opacity >= 1 {
+		return c
+	}
+	c.A = uint8(float64(c.A) * opacity)
+	return c
+}

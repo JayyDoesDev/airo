@@ -2,6 +2,7 @@ package taskqueue
 
 import (
 	"log"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,8 +26,9 @@ type Task struct {
 }
 
 type Queue struct {
-	tasks chan Task
-	quit  chan struct{}
+	tasks  chan Task
+	quit   chan struct{}
+	active int32
 }
 
 func NewQueue(bufferSize int) *Queue {
@@ -42,7 +44,9 @@ func (q *Queue) Start(workerName string) {
 			select {
 			case task := <-q.tasks:
 				log.Printf("[%s] Executing task: %s for user %s", workerName, task.Action, task.UserID)
+				atomic.AddInt32(&q.active, 1)
 				err := task.Execute()
+				atomic.AddInt32(&q.active, -1)
 				if err != nil {
 					log.Printf("[%s] Task failed: %v", workerName, err)
 				}
@@ -57,6 +61,14 @@ func (q *Queue) Start(workerName string) {
 
 func (q *Queue) Add(task Task) {
 	q.tasks <- task
+}
+
+func (q *Queue) Len() int {
+	return len(q.tasks)
+}
+
+func (q *Queue) Active() int {
+	return int(atomic.LoadInt32(&q.active))
 }
 
 func (q *Queue) Stop() {

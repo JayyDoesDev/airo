@@ -8,30 +8,34 @@ import (
 )
 
 type StatsConfig struct {
-	Data   []float64 `json:"data"`
-	Label  string    `json:"label,omitempty"`
-	Theme  string    `json:"theme,omitempty"`
-	Bins   int       `json:"bins,omitempty"`
+	Data	[]float64	`json:"data"`
+	Values	[]float64	`json:"values,omitempty"`
+	Label	string		`json:"label,omitempty"`
+	Theme	string		`json:"theme,omitempty"`
+	Bins	int		`json:"bins,omitempty"`
 }
 
 type StatsResult struct {
-	Count    int
-	Mean     float64
-	Median   float64
-	Mode     []float64
-	StdDev   float64
-	Variance float64
-	Min      float64
-	Max      float64
-	Range    float64
-	P25      float64
-	P75      float64
-	P95      float64
-	IQR      float64
+	Count		int
+	Mean		float64
+	Median		float64
+	Mode		[]float64
+	StdDev		float64
+	Variance	float64
+	Min		float64
+	Max		float64
+	Range		float64
+	P25		float64
+	P75		float64
+	P95		float64
+	IQR		float64
 }
 
 func CalculateStats(cfg StatsConfig) (StatsResult, ChartConfig, error) {
 	data := cfg.Data
+	if len(data) == 0 && len(cfg.Values) > 0 {
+		data = cfg.Values
+	}
 	if len(data) == 0 {
 		return StatsResult{}, ChartConfig{}, fmt.Errorf("no data provided")
 	}
@@ -139,15 +143,15 @@ func buildHistogram(sorted []float64, cfg StatsConfig) ChartConfig {
 	}
 
 	return ChartConfig{
-		Type:    "bar",
-		Title:   "Distribution of " + label,
-		XLabels: labels,
+		Type:		"bar",
+		Title:		"Distribution of " + label,
+		XLabels:	labels,
 		Datasets: []ChartDataset{
 			{Name: label, Values: counts},
 		},
-		Width:  1400,
-		Height: 700,
-		Theme:  theme,
+		Width:	1400,
+		Height:	700,
+		Theme:	theme,
 	}
 }
 

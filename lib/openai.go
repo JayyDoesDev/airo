@@ -13,21 +13,21 @@ import (
 )
 
 type OpenAI struct {
-	Token    string
-	Client   openai.Client
-	Prompt   string
-	Response string
+	Token		string
+	Client		openai.Client
+	Prompt		string
+	Response	string
 }
 
 func NewOpenAIClient(token string) *OpenAI {
 	client := openai.NewClient(token)
 	return &OpenAI{
-		Token:  token,
-		Client: *client,
+		Token:	token,
+		Client:	*client,
 	}
 }
 
-func (opai *OpenAI) Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
+func (opai *OpenAI) Send(authorID string, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory, extraContext ...string) (string, error) {
 	ctx := context.Background()
 
 	memJSON, _ := json.MarshalIndent(mem, "", "  ")
@@ -64,7 +64,7 @@ Your Memory: %s
 `, SystemPromptBase, authorID, authorUsername, serverDescription, userMessage, string(memJSON))
 
 	resp, err := opai.Client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: openai.GPT4oMini,
+		Model:	openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
 			{Role: "system", Content: SystemPromptBase},
 			{Role: "user", Content: fullPrompt},

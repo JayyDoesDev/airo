@@ -12,18 +12,18 @@ import (
 )
 
 type DeepSeek struct {
-	Token    string
-	Client   deepseek.Client
-	Prompt   string
-	Response string
+	Token		string
+	Client		deepseek.Client
+	Prompt		string
+	Response	string
 }
 
 func NewDeepSeekClient(token string) *DeepSeek {
 	client := deepseek.NewClient(token)
 
 	return &DeepSeek{
-		Token:  token,
-		Client: *client,
+		Token:	token,
+		Client:	*client,
 	}
 }
 
@@ -32,52 +32,74 @@ func (ds *DeepSeek) SetToken(token string) {
 	ds.Client = *deepseek.NewClient(token)
 }
 
-func buildSystemPrompt(msg string) string {
-	lower := strings.ToLower(msg)
-	sb := strings.Builder{}
-	sb.WriteString(SystemPromptBase)
+// AcademicMode switches the bot persona to Asakawa when true.
+var AcademicMode bool
 
-	artKW := []string{"draw", "drawing", "pixel", "art", "paint", "sketch", "canvas", "scene", "picture", "image", "sprite", "gradient", "illustration"}
-	mathKW := []string{"math", "formula", "equation", "plot", "calculate", "stats", "statistic", "convert", "matrix", "prime", "factor", "benchmark", "latex", "sqrt", "integral", "solve", "derivative", "graph", "number theory", "fibonacci", "unit"}
-	chartKW := []string{"chart", "bar chart", "pie chart", "line chart", "radar", "visualize", "visualization", "data"}
-
-	for _, kw := range artKW {
-		if strings.Contains(lower, kw) {
-			sb.WriteString(CapabilityBlockArt)
-			break
-		}
+func buildSystemPrompt(_ string) string {
+	if AcademicMode {
+		return AcademicSystemPromptBase
 	}
-	for _, kw := range mathKW {
-		if strings.Contains(lower, kw) {
-			sb.WriteString(CapabilityBlockMath)
-			break
-		}
-	}
-	for _, kw := range chartKW {
-		if strings.Contains(lower, kw) {
-			sb.WriteString(CapabilityBlockChart)
-			break
-		}
-	}
-	return sb.String()
+	return SystemPromptBase
 }
 
-func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory) (string, error) {
+func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.Guild, userMessage string, mem actions.Memory, extraContext ...string) (string, error) {
 	ctx := context.Background()
 
-	pruned := actions.PruneMemoryForPrompt(mem, authorID, "", 8, 15)
-	memText := formatMemory(pruned, authorID == "419958345487745035")
+	isPrimeAdmin := authorID == "419958345487745035"
+	lower := strings.ToLower(userMessage)
+	isMemoryOp := isPrimeAdmin && (strings.Contains(lower, "delete memor") ||
+		strings.Contains(lower, "remove memor") ||
+		strings.Contains(lower, "update memor") ||
+		strings.Contains(lower, "update importance") ||
+		strings.Contains(lower, "change importance") ||
+		strings.Contains(lower, "list memor") ||
+		strings.Contains(lower, "show memor") ||
+		strings.Contains(lower, "find memor") ||
+		strings.Contains(lower, "search memor"))
+
+	var memText string
+	if isMemoryOp {
+		memText = formatMemory(mem, true)
+	} else {
+		pruned := actions.PruneMemoryForPrompt(mem, authorID, "", 20, 30)
+		memText = formatMemory(pruned, isPrimeAdmin)
+	}
+
+	relationMems := actions.RelationshipMemory(mem, authorID)
+	if len(relationMems) > 0 {
+		var rb strings.Builder
+		rb.WriteString("\nYour relationship with this user:")
+		for _, m := range relationMems {
+			rb.WriteString("\n- ")
+			rb.WriteString(m.Content)
+		}
+		memText += rb.String()
+	}
+
+	opinionMems := actions.OpinionMemories(mem)
+	if len(opinionMems) > 0 {
+		var ob strings.Builder
+		ob.WriteString("\nYour opinions:")
+		for _, m := range opinionMems {
+			ob.WriteString("\n- ")
+			ob.WriteString(m.Title)
+			ob.WriteString(": ")
+			ob.WriteString(m.Content)
+		}
+		memText += ob.String()
+	}
 
 	serverDescription := fmt.Sprintf("Server: %s (ID: %s, %d members)", serverInfo.Name, serverInfo.ID, serverInfo.MemberCount)
 
-	userPrompt := fmt.Sprintf("[%s] %s (ID: %s): %s\n%s", serverDescription, authorUsername, authorID, userMessage, memText)
+	extra := strings.Join(extraContext, "\n")
+	userPrompt := fmt.Sprintf("[%s] %s (ID: %s): %s\n%s%s", serverDescription, authorUsername, authorID, userMessage, memText, extra)
 
 	systemPrompt := buildSystemPrompt(userMessage)
 
 	req := &deepseek.ChatCompletionRequest{
-		Model:           deepseek.DeepSeekV4Flash,
-		ReasoningEffort: "low",
-		ResponseFormat:  &deepseek.ResponseFormat{Type: "json_object"},
+		Model:			deepseek.DeepSeekV4Flash,
+		ReasoningEffort:	"low",
+		ResponseFormat:		&deepseek.ResponseFormat{Type: "json_object"},
 		Messages: []deepseek.ChatCompletionMessage{
 			{Role: deepseek.ChatMessageRoleSystem, Content: systemPrompt},
 			{Role: deepseek.ChatMessageRoleUser, Content: userPrompt},
@@ -88,16 +110,23 @@ func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.G
 	var err error
 	for attempt := range 3 {
 		resp, err = ds.Client.CreateChatCompletion(ctx, req)
-		if err == nil {
+		if err != nil {
+			if attempt == 2 {
+				return "", extractAPIError(err)
+			}
+			continue
+		}
+		if len(resp.Choices) > 0 && stripThinking(resp.Choices[0].Message.Content) != "" {
 			break
 		}
 		if attempt == 2 {
-			return "", extractAPIError(err)
+			return "", fmt.Errorf("model returned an empty response after 3 attempts")
 		}
+		fmt.Println("[deepseek] empty response, retrying...")
 	}
 
 	ds.Prompt = userPrompt
-	ds.Response = resp.Choices[0].Message.Content
+	ds.Response = stripThinking(resp.Choices[0].Message.Content)
 
 	if u := resp.Usage; u.PromptCacheHitTokens > 0 || u.PromptCacheMissTokens > 0 {
 		fmt.Printf("[cache] hit=%d miss=%d total_prompt=%d completion=%d\n",
@@ -106,6 +135,14 @@ func (ds *DeepSeek) Send(authorID, authorUsername string, serverInfo discordgo.G
 	}
 
 	return ds.Response, nil
+}
+
+func stripThinking(s string) string {
+	const thinkEnd = "<｜end▁of▁thinking｜>"
+	if idx := strings.LastIndex(s, thinkEnd); idx != -1 {
+		s = s[idx+len(thinkEnd):]
+	}
+	return strings.TrimSpace(s)
 }
 
 func extractAPIError(err error) error {

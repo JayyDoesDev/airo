@@ -13,42 +13,42 @@ import (
 )
 
 type Memory struct {
-	ShortTerm []MemoryItem `msgpack:"shortTerm,omitempty"`
-	LongTerm  []MemoryItem `msgpack:"longTerm,omitempty"`
-	Topics    []Topic      `msgpack:"topics,omitempty"`
-	Meta      MemoryMeta   `msgpack:"meta"`
+	ShortTerm	[]MemoryItem	`msgpack:"shortTerm,omitempty"`
+	LongTerm	[]MemoryItem	`msgpack:"longTerm,omitempty"`
+	Topics		[]Topic		`msgpack:"topics,omitempty"`
+	Meta		MemoryMeta	`msgpack:"meta"`
 }
 
 type MemoryItem struct {
-	Id           string             `msgpack:"id"`
-	Title        string             `msgpack:"title"`
-	Content      string             `msgpack:"content"`
-	Type         string             `msgpack:"type"`
-	Source       string             `msgpack:"source"`
-	Importance   float32            `msgpack:"importance"`
-	Created      string             `msgpack:"created"`
-	Lastaccessed string             `msgpack:"lastAccessed"`
-	Related      []string           `msgpack:"related,omitempty"`
-	Context      *MemoryItemContext `msgpack:"context"`
-	Value        *float64           `msgpack:"value,omitempty"`
-	Tag          string             `msgpack:"tag,omitempty"`
+	Id		string			`msgpack:"id"`
+	Title		string			`msgpack:"title"`
+	Content		string			`msgpack:"content"`
+	Type		string			`msgpack:"type"`
+	Source		string			`msgpack:"source"`
+	Importance	float32			`msgpack:"importance"`
+	Created		string			`msgpack:"created"`
+	Lastaccessed	string			`msgpack:"lastAccessed"`
+	Related		[]string		`msgpack:"related,omitempty"`
+	Context		*MemoryItemContext	`msgpack:"context"`
+	Value		*float64		`msgpack:"value,omitempty"`
+	Tag		string			`msgpack:"tag,omitempty"`
 }
 
 type MemoryItemContext struct {
-	Location string `msgpack:"location"`
-	Author   string `msgpack:"author"`
+	Location	string	`msgpack:"location"`
+	Author		string	`msgpack:"author"`
 }
 
 type Topic struct {
-	Name             string   `msgpack:"name"`
-	Description      string   `msgpack:"description"`
-	RelatedMemoryIDs []string `msgpack:"relatedMemoryIds"`
+	Name			string		`msgpack:"name"`
+	Description		string		`msgpack:"description"`
+	RelatedMemoryIDs	[]string	`msgpack:"relatedMemoryIds"`
 }
 
 type MemoryMeta struct {
-	Lastupdated   string   `msgpack:"lastUpdated"`
-	Totalmemories int      `msgpack:"TotalMemories"`
-	PriorityQueue []string `msgpack:"priorityQueue,omitempty"`
+	Lastupdated	string		`msgpack:"lastUpdated"`
+	Totalmemories	int		`msgpack:"TotalMemories"`
+	PriorityQueue	[]string	`msgpack:"priorityQueue,omitempty"`
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -207,15 +207,21 @@ func QueryMemoriesByTag(tag string) ([]MemoryItem, error) {
 	if err != nil {
 		return nil, err
 	}
+	lower := strings.ToLower(tag)
 	var results []MemoryItem
-	for _, m := range mem.LongTerm {
+	for _, m := range append(mem.LongTerm, mem.ShortTerm...) {
 		if m.Tag == tag && m.Value != nil {
 			results = append(results, m)
 		}
 	}
-	for _, m := range mem.ShortTerm {
-		if m.Tag == tag && m.Value != nil {
-			results = append(results, m)
+
+	if len(results) == 0 {
+		for _, m := range append(mem.LongTerm, mem.ShortTerm...) {
+			if strings.Contains(strings.ToLower(m.Title), lower) || strings.Contains(strings.ToLower(m.Content), lower) {
+				v := float64(m.Importance)
+				m.Value = &v
+				results = append(results, m)
+			}
 		}
 	}
 	return results, nil
@@ -277,6 +283,27 @@ func DeleteMemory(id string) error {
 	return SaveMemoryToFile("memory.msgpack", mem)
 }
 
+func RelationshipMemory(mem Memory, userID string) []MemoryItem {
+	tag := "relation:" + userID
+	var out []MemoryItem
+	for _, m := range append(mem.LongTerm, mem.ShortTerm...) {
+		if m.Tag == tag {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func OpinionMemories(mem Memory) []MemoryItem {
+	var out []MemoryItem
+	for _, m := range mem.LongTerm {
+		if m.Tag == "opinion" {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 func PruneMemoryForPrompt(mem Memory, authorID, channelID string, maxShort, maxLong int) Memory {
 	score := func(item MemoryItem) float64 {
 		s := float64(item.Importance)
@@ -321,9 +348,9 @@ func PruneMemoryForPrompt(mem Memory, authorID, channelID string, maxShort, maxL
 	}
 
 	return Memory{
-		ShortTerm: short,
-		LongTerm:  long,
-		Meta:      mem.Meta,
+		ShortTerm:	short,
+		LongTerm:	long,
+		Meta:		mem.Meta,
 	}
 }
 

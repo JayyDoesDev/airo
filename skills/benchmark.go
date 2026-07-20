@@ -12,45 +12,63 @@ import (
 )
 
 type BenchmarkConfig struct {
-	Expressions []BenchmarkExpr `json:"expressions"`
-	Variable    string          `json:"variable"`
-	RangeStart  float64         `json:"range_start"`
-	RangeEnd    float64         `json:"range_end"`
-	Steps       int             `json:"steps"`
-	Iterations  int             `json:"iterations"`
+	Expressions	[]BenchmarkExpr	`json:"expressions"`
+	Expression	string		`json:"expression,omitempty"`
+	Variable	string		`json:"variable"`
+	RangeStart	float64		`json:"range_start"`
+	RangeEnd	float64		`json:"range_end"`
+	Start		float64		`json:"start,omitempty"`
+	End		float64		`json:"end,omitempty"`
+	Steps		int		`json:"steps"`
+	Iterations	int		`json:"iterations"`
 }
 
 type BenchmarkExpr struct {
-	Label string `json:"label"`
-	Expr  string `json:"expr"`
+	Label	string	`json:"label"`
+	Expr	string	`json:"expr"`
 }
 
 type BenchmarkResult struct {
-	Label   string
-	XValues []float64
-	NsPerOp []float64
+	Label	string
+	XValues	[]float64
+	NsPerOp	[]float64
 }
 
 var allowedFunctions = map[string]govaluate.ExpressionFunction{
-	"sqrt":  func(args ...interface{}) (interface{}, error) { return math.Sqrt(toFloat(args[0])), nil },
-	"abs":   func(args ...interface{}) (interface{}, error) { return math.Abs(toFloat(args[0])), nil },
-	"sin":   func(args ...interface{}) (interface{}, error) { return math.Sin(toFloat(args[0])), nil },
-	"cos":   func(args ...interface{}) (interface{}, error) { return math.Cos(toFloat(args[0])), nil },
-	"tan":   func(args ...interface{}) (interface{}, error) { return math.Tan(toFloat(args[0])), nil },
-	"log":   func(args ...interface{}) (interface{}, error) { return math.Log(toFloat(args[0])), nil },
-	"log2":  func(args ...interface{}) (interface{}, error) { return math.Log2(toFloat(args[0])), nil },
-	"log10": func(args ...interface{}) (interface{}, error) { return math.Log10(toFloat(args[0])), nil },
-	"ceil":  func(args ...interface{}) (interface{}, error) { return math.Ceil(toFloat(args[0])), nil },
-	"floor": func(args ...interface{}) (interface{}, error) { return math.Floor(toFloat(args[0])), nil },
-	"pow":   func(args ...interface{}) (interface{}, error) { return math.Pow(toFloat(args[0]), toFloat(args[1])), nil },
-	"round": func(args ...interface{}) (interface{}, error) { return math.Round(toFloat(args[0])), nil },
-	"min":   func(args ...interface{}) (interface{}, error) { return math.Min(toFloat(args[0]), toFloat(args[1])), nil },
-	"max":   func(args ...interface{}) (interface{}, error) { return math.Max(toFloat(args[0]), toFloat(args[1])), nil },
+	"sqrt":		func(args ...interface{}) (interface{}, error) { return math.Sqrt(toFloat(args[0])), nil },
+	"abs":		func(args ...interface{}) (interface{}, error) { return math.Abs(toFloat(args[0])), nil },
+	"sin":		func(args ...interface{}) (interface{}, error) { return math.Sin(toFloat(args[0])), nil },
+	"cos":		func(args ...interface{}) (interface{}, error) { return math.Cos(toFloat(args[0])), nil },
+	"tan":		func(args ...interface{}) (interface{}, error) { return math.Tan(toFloat(args[0])), nil },
+	"log":		func(args ...interface{}) (interface{}, error) { return math.Log(toFloat(args[0])), nil },
+	"log2":		func(args ...interface{}) (interface{}, error) { return math.Log2(toFloat(args[0])), nil },
+	"log10":	func(args ...interface{}) (interface{}, error) { return math.Log10(toFloat(args[0])), nil },
+	"ceil":		func(args ...interface{}) (interface{}, error) { return math.Ceil(toFloat(args[0])), nil },
+	"floor":	func(args ...interface{}) (interface{}, error) { return math.Floor(toFloat(args[0])), nil },
+	"pow": func(args ...interface{}) (interface{}, error) {
+		return math.Pow(toFloat(args[0]), toFloat(args[1])), nil
+	},
+	"round":	func(args ...interface{}) (interface{}, error) { return math.Round(toFloat(args[0])), nil },
+	"min": func(args ...interface{}) (interface{}, error) {
+		return math.Min(toFloat(args[0]), toFloat(args[1])), nil
+	},
+	"max": func(args ...interface{}) (interface{}, error) {
+		return math.Max(toFloat(args[0]), toFloat(args[1])), nil
+	},
 }
 
 var unsafePattern = regexp.MustCompile(`(?i)(import|exec|os\.|syscall|unsafe|http|file|open|read|write|eval|func|go |chan |select|for |while)`)
 
 func RunBenchmark(cfg BenchmarkConfig) ([]BenchmarkResult, error) {
+	if len(cfg.Expressions) == 0 && cfg.Expression != "" {
+		cfg.Expressions = []BenchmarkExpr{{Label: cfg.Expression, Expr: cfg.Expression}}
+	}
+	if cfg.RangeStart == 0 && cfg.Start != 0 {
+		cfg.RangeStart = cfg.Start
+	}
+	if cfg.RangeEnd == 0 && cfg.End != 0 {
+		cfg.RangeEnd = cfg.End
+	}
 	if len(cfg.Expressions) == 0 {
 		return nil, fmt.Errorf("no expressions provided")
 	}
@@ -125,9 +143,9 @@ func RunBenchmark(cfg BenchmarkConfig) ([]BenchmarkResult, error) {
 		}
 
 		results = append(results, BenchmarkResult{
-			Label:   expr.Label,
-			XValues: xValues,
-			NsPerOp: nsPerOp,
+			Label:		expr.Label,
+			XValues:	xValues,
+			NsPerOp:	nsPerOp,
 		})
 	}
 
@@ -145,27 +163,27 @@ func BenchmarkToChart(results []BenchmarkResult, variable string) ChartConfig {
 		values := make([]float64, len(r.NsPerOp))
 		copy(values, r.NsPerOp)
 		datasets[i] = ChartDataset{
-			Name:   r.Label,
-			Values: values,
+			Name:	r.Label,
+			Values:	values,
 		}
 	}
 
 	title := "Benchmark: ns/op vs " + variable
 	return ChartConfig{
-		Type:     "line",
-		Title:    title,
-		XLabels:  xLabels,
-		Datasets: datasets,
-		Width:    1400,
-		Height:   700,
-		Theme:    "dark",
+		Type:		"line",
+		Title:		title,
+		XLabels:	xLabels,
+		Datasets:	datasets,
+		Width:		1400,
+		Height:		700,
+		Theme:		"dark",
 	}
 }
 
 func timeExpr(ctx context.Context, expr *govaluate.EvaluableExpression, params map[string]interface{}, iterations int) (float64, error) {
 	type result struct {
-		ns  float64
-		err error
+		ns	float64
+		err	error
 	}
 	ch := make(chan result, 1)
 
@@ -208,7 +226,7 @@ func validateExpr(expr string) error {
 			}
 		}
 		if !found {
-			// assume it's a variable — fine
+
 		}
 	}
 	return nil

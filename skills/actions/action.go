@@ -9,22 +9,44 @@ import (
 	"github.com/jayydoesdev/airo/bot/skills"
 )
 
+func resolveUserID(id string) string {
+	id = strings.TrimPrefix(id, "<@!")
+	id = strings.TrimPrefix(id, "<@")
+	id = strings.TrimSuffix(id, ">")
+	return strings.TrimSpace(id)
+}
+
+func resolveRoleID(s *discordgo.Session, guildID, nameOrID string) string {
+	roles, err := s.GuildRoles(guildID)
+	if err != nil {
+		return nameOrID
+	}
+	lower := strings.ToLower(nameOrID)
+	for _, r := range roles {
+		if r.ID == nameOrID || strings.ToLower(r.Name) == lower {
+			return r.ID
+		}
+	}
+	return nameOrID
+}
+
 func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate) error {
+	task.TargetUser = resolveUserID(task.TargetUser)
 	switch task.Action {
 	case "kick_user":
 		err := s.GuildMemberDeleteWithReason(m.GuildID, task.TargetUser, task.Reason)
 		if err == nil {
 			StoreToMemory(MemoryItem{
-				Id:         GenerateID(),
-				Title:      "User kicked",
-				Content:    "Kicked user " + task.TargetUser + " for: " + task.Reason,
-				Type:       "moderation",
-				Source:     "action",
-				Importance: 0.6,
-				Created:    time.Now().Format(time.RFC3339),
+				Id:		GenerateID(),
+				Title:		"User kicked",
+				Content:	"Kicked user " + task.TargetUser + " for: " + task.Reason,
+				Type:		"moderation",
+				Source:		"action",
+				Importance:	0.6,
+				Created:	time.Now().Format(time.RFC3339),
 				Context: &MemoryItemContext{
-					Location: m.ChannelID,
-					Author:   m.Author.ID,
+					Location:	m.ChannelID,
+					Author:		m.Author.ID,
 				},
 			})
 		}
@@ -38,54 +60,56 @@ func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate
 		}
 
 		StoreToMemory(MemoryItem{
-			Id:         GenerateID(),
-			Title:      "User banned",
-			Content:    "Banned user " + task.TargetUser + " for: " + task.Reason,
-			Type:       "moderation",
-			Source:     "action",
-			Importance: 0.7,
-			Created:    time.Now().Format(time.RFC3339),
+			Id:		GenerateID(),
+			Title:		"User banned",
+			Content:	"Banned user " + task.TargetUser + " for: " + task.Reason,
+			Type:		"moderation",
+			Source:		"action",
+			Importance:	0.7,
+			Created:	time.Now().Format(time.RFC3339),
 			Context: &MemoryItemContext{
-				Location: m.ChannelID,
-				Author:   m.Author.ID,
+				Location:	m.ChannelID,
+				Author:		m.Author.ID,
 			},
 		})
 
 		return nil
 
 	case "assign_role":
+		task.Role = resolveRoleID(s, m.GuildID, task.Role)
 		err := s.GuildMemberRoleAdd(m.GuildID, task.TargetUser, task.Role)
 		if err == nil {
 			StoreToMemory(MemoryItem{
-				Id:         GenerateID(),
-				Title:      "Assigned role",
-				Content:    "Assigned role " + task.Role + " to user " + task.TargetUser,
-				Type:       "role",
-				Source:     "action",
-				Importance: 0.3,
-				Created:    time.Now().Format(time.RFC3339),
+				Id:		GenerateID(),
+				Title:		"Assigned role",
+				Content:	"Assigned role " + task.Role + " to user " + task.TargetUser,
+				Type:		"role",
+				Source:		"action",
+				Importance:	0.3,
+				Created:	time.Now().Format(time.RFC3339),
 				Context: &MemoryItemContext{
-					Location: m.ChannelID,
-					Author:   m.Author.ID,
+					Location:	m.ChannelID,
+					Author:		m.Author.ID,
 				},
 			})
 		}
 		return err
 
 	case "remove_role":
+		task.Role = resolveRoleID(s, m.GuildID, task.Role)
 		err := s.GuildMemberRoleRemove(m.GuildID, task.TargetUser, task.Role)
 		if err == nil {
 			StoreToMemory(MemoryItem{
-				Id:         GenerateID(),
-				Title:      "Removed role",
-				Content:    "Removed role " + task.Role + " from user " + task.TargetUser,
-				Type:       "role",
-				Source:     "action",
-				Importance: 0.3,
-				Created:    time.Now().Format(time.RFC3339),
+				Id:		GenerateID(),
+				Title:		"Removed role",
+				Content:	"Removed role " + task.Role + " from user " + task.TargetUser,
+				Type:		"role",
+				Source:		"action",
+				Importance:	0.3,
+				Created:	time.Now().Format(time.RFC3339),
 				Context: &MemoryItemContext{
-					Location: m.ChannelID,
-					Author:   m.Author.ID,
+					Location:	m.ChannelID,
+					Author:		m.Author.ID,
 				},
 			})
 		}
@@ -104,16 +128,16 @@ func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate
 		}
 
 		StoreToMemory(MemoryItem{
-			Id:         GenerateID(),
-			Title:      "DM sent",
-			Content:    "Sent DM to " + task.TargetUser + ": " + task.DMContent,
-			Type:       "message",
-			Source:     "DM",
-			Importance: 0.4,
-			Created:    time.Now().Format(time.RFC3339),
+			Id:		GenerateID(),
+			Title:		"DM sent",
+			Content:	"Sent DM to " + task.TargetUser + ": " + task.DMContent,
+			Type:		"message",
+			Source:		"DM",
+			Importance:	0.4,
+			Created:	time.Now().Format(time.RFC3339),
 			Context: &MemoryItemContext{
-				Location: m.ChannelID,
-				Author:   m.Author.ID,
+				Location:	m.ChannelID,
+				Author:		m.Author.ID,
 			},
 		})
 
@@ -146,24 +170,24 @@ func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate
 		}
 
 		StoreToMemory(MemoryItem{
-			Id:         GenerateID(),
-			Title:      "Listed user roles",
-			Content:    "User " + task.TargetUser + " has roles:\n" + roleList,
-			Type:       "role",
-			Source:     "action",
-			Importance: 0.2,
-			Created:    time.Now().Format(time.RFC3339),
+			Id:		GenerateID(),
+			Title:		"Listed user roles",
+			Content:	"User " + task.TargetUser + " has roles:\n" + roleList,
+			Type:		"role",
+			Source:		"action",
+			Importance:	0.2,
+			Created:	time.Now().Format(time.RFC3339),
 			Context: &MemoryItemContext{
-				Location: m.ChannelID,
-				Author:   m.Author.ID,
+				Location:	m.ChannelID,
+				Author:		m.Author.ID,
 			},
 		})
 
 		if task.UseEmbed {
 			embed := &discordgo.MessageEmbed{
-				Title:       task.EmbedTitle,
-				Description: roleList,
-				Color:       0x1ABC9C,
+				Title:		task.EmbedTitle,
+				Description:	roleList,
+				Color:		0x1ABC9C,
 			}
 			if task.ResponseMsg != "" {
 				s.ChannelMessageSend(m.ChannelID, task.ResponseMsg)
@@ -212,11 +236,11 @@ func HandleActions(task Action, s *discordgo.Session, m *discordgo.MessageCreate
 			activityType = discordgo.ActivityTypeStreaming
 		}
 		return s.UpdateStatusComplex(discordgo.UpdateStatusData{
-			Status: status,
+			Status:	status,
 			Activities: []*discordgo.Activity{
 				{
-					Name: task.ActivityText,
-					Type: activityType,
+					Name:	task.ActivityText,
+					Type:	activityType,
 				},
 			},
 		})

@@ -6,19 +6,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jayydoesdev/airo/bot/lib"
 	"github.com/jayydoesdev/airo/bot/skills"
 	"github.com/jayydoesdev/airo/bot/skills/actions"
+	"github.com/jayydoesdev/airo/bot/skills/reminders"
 	taskqueue "github.com/jayydoesdev/airo/bot/tasks"
-)
-
-var (
-	lastDrawing   = map[string]*skills.DrawingConfig{}
-	lastDrawingMu sync.RWMutex
 )
 
 func HandleMentions(id string) (string, string) {
@@ -120,11 +115,26 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
+	canvases := skills.GlobalCanvasManager.ListCanvases(m.ChannelID)
+	canvasContext := ""
+	if len(canvases) > 0 {
+		canvasContext = "\n\nActive canvases in this channel:\n"
+		for _, c := range canvases {
+			jsonStr, err := skills.GlobalCanvasManager.CanvasJSON(c.ID)
+			if err != nil {
+				continue
+			}
+			canvasContext += fmt.Sprintf("- Canvas ID: %s, Name: %s\n  State: %s\n", c.ID, c.Name, jsonStr)
+		}
+	}
+
 	tier := GetTier(m.Author.ID)
 	tierContext := fmt.Sprintf("\n[User trust tier: %s]", TierLabel(tier))
-	fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + primeAdmin + tierContext + "\n\nUser says: " + content + prevDrawingContext
+	fullPrompt := "Your permissions in this server:\n" + formatPermissions(botPerms) + primeAdmin + tierContext + "\n\nUser says: " + content + prevDrawingContext + canvasContext
 
-	resp, err := client.Send(m.Author.ID, m.Author.Username, *guild, fullPrompt, mem)
+	channelCtx := buildChannelContext(s, m.ChannelID, m.ID)
+
+	resp, err := client.Send(m.Author.ID, m.Author.Username, *guild, fullPrompt, mem, channelCtx)
 	if err != nil {
 		s.ChannelMessageSend(m.ChannelID, "Error: "+err.Error())
 		return
@@ -162,8 +172,10 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@everyone", "everyone")
-	actionData.ResponseMsg = strings.ReplaceAll(actionData.ResponseMsg, "@here", "here")
+	actionData.ResponseMsg = sanitizePings(actionData.ResponseMsg)
+	actionData.EmbedDescription = sanitizePings(actionData.EmbedDescription)
+	actionData.EmbedTitle = sanitizePings(actionData.EmbedTitle)
+	actionData.DMContent = sanitizePings(actionData.DMContent)
 
 	if jsonOut, _ := json.MarshalIndent(actionData, "", "  "); true {
 		fmt.Println("=== ACTION DATA ===")
@@ -284,264 +296,55 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	chartCfg := actionData.Chart
-	if chartCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "generate_chart" && t.Chart != nil {
-				chartCfg = t.Chart
-				break
-			}
-		}
+	authorTier := GetTier(m.Author.ID)
+	if authorTier > TierTrusted {
+		actionData.CanvasOp = nil
+		actionData.StatusType = ""
+		actionData.ActivityType = ""
+		actionData.ActivityText = ""
+		actionData.SetStatus = nil
 	}
 
-	drawingCfg := actionData.Drawing
-	if drawingCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "generate_drawing" && t.Drawing != nil {
-				drawingCfg = t.Drawing
-				break
-			}
+	canvas := executeCanvasOps(actionData, m.ChannelID)
+
+	if canvas.CanvasResp != "" {
+		combined := canvas.CanvasResp + "\n\n" + actionData.ResponseMsg
+		if len(combined) > 3800 {
+			combined = combined[:3800] + "\n…"
 		}
+		actionData.ResponseMsg = combined
 	}
 
-	pixelArtCfg := actionData.PixelArt
-	if pixelArtCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "generate_pixel_art" && t.PixelArt != nil {
-				pixelArtCfg = t.PixelArt
-				break
-			}
-		}
+	if hasRenders(actionData) {
+		QueueRenders(actionData, s, m)
 	}
 
-	benchmarkCfg := actionData.Benchmark
-	if benchmarkCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "run_benchmark" && t.Benchmark != nil {
-				benchmarkCfg = t.Benchmark
-				break
-			}
-		}
+	content, embeds, files := buildMessage(actionData, didSearch, refs, canvas.CanvasPNG, canvas.CanvasFilename)
+	fmt.Println("[send] sending message, embeds:", len(embeds), "files:", len(files))
+	fmt.Println("[send] response msg length:", len(actionData.ResponseMsg))
+	if content == "" && len(embeds) == 0 && len(files) == 0 {
+		fmt.Println("[send] nothing to send, skipping")
+		return
 	}
-	if benchmarkCfg != nil && chartCfg == nil {
-		results, err := skills.RunBenchmark(*benchmarkCfg)
-		if err != nil {
-			fmt.Println("[benchmark] error:", err)
-		} else {
-			variable := benchmarkCfg.Variable
-			if variable == "" {
-				variable = "x"
-			}
-			generated := skills.BenchmarkToChart(results, variable)
-			chartCfg = &generated
-		}
-	}
-
-	plotCfg := actionData.Plot
-	if plotCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "plot_function" && t.Plot != nil {
-				plotCfg = t.Plot
-				break
-			}
-		}
-	}
-	if plotCfg != nil && chartCfg == nil {
-		generated, err := skills.PlotToChart(*plotCfg)
-		if err != nil {
-			fmt.Println("[plot] error:", err)
-		} else {
-			chartCfg = &generated
-		}
-	}
-
-	statsCfg := actionData.Stats
-	if statsCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "calculate_stats" && t.Stats != nil {
-				statsCfg = t.Stats
-				break
-			}
-		}
-	}
-	var statsText string
-	if statsCfg != nil {
-		statsResult, statsChart, err := skills.CalculateStats(*statsCfg)
-		if err != nil {
-			fmt.Println("[stats] error:", err)
-		} else {
-			statsText = skills.StatsResultToText(statsResult, statsCfg.Label)
-			if chartCfg == nil {
-				chartCfg = &statsChart
-			}
-		}
-	}
-
-	solverCfg := actionData.Solver
-	if solverCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "solve_equation" && t.Solver != nil {
-				solverCfg = t.Solver
-				break
-			}
-		}
-	}
-	var solverText string
-	if solverCfg != nil {
-		solverResult, err := skills.SolveEquation(*solverCfg)
-		if err != nil {
-			fmt.Println("[solver] error:", err)
-		} else {
-			solverText = skills.SolverResultToText(solverResult, solverCfg.Equation, solverCfg.Variable)
-			if chartCfg == nil {
-				chartCfg = &solverResult.Chart
-			}
-		}
-	}
-
-	latexCfg := actionData.Latex
-	if latexCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "render_latex" && t.Latex != nil {
-				latexCfg = t.Latex
-				break
-			}
-		}
-	}
-	var latexPNG []byte
-	if latexCfg != nil {
-		latexPNG, err = skills.RenderLatex(*latexCfg)
-		if err != nil {
-			fmt.Println("[latex] render error:", err)
-			latexPNG = nil
-		}
-	}
-
-	unitCfg := actionData.UnitConvert
-	if unitCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "convert_unit" && t.UnitConvert != nil {
-				unitCfg = t.UnitConvert
-				break
-			}
-		}
-	}
-	var unitText string
-	if unitCfg != nil {
-		r, err := skills.ConvertUnit(*unitCfg)
-		if err != nil {
-			unitText = "unit convert error: " + err.Error()
-		} else {
-			unitText = r.Formula
-		}
-	}
-
-	ntCfg := actionData.NumberTheory
-	if ntCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "number_theory" && t.NumberTheory != nil {
-				ntCfg = t.NumberTheory
-				break
-			}
-		}
-	}
-	var ntText string
-	if ntCfg != nil {
-		r, err := skills.RunNumberTheory(*ntCfg)
-		if err != nil {
-			ntText = "number theory error: " + err.Error()
-		} else {
-			ntText = r.Output
-		}
-	}
-
-	matrixCfg := actionData.Matrix
-	if matrixCfg == nil {
-		for _, t := range actionData.Tasks {
-			if t.Action == "matrix_operation" && t.Matrix != nil {
-				matrixCfg = t.Matrix
-				break
-			}
-		}
-	}
-	var matrixText string
-	if matrixCfg != nil {
-		r, err := skills.RunMatrix(*matrixCfg)
-		if err != nil {
-			matrixText = "matrix error: " + err.Error()
-		} else {
-			matrixText = r.Output
-			if latexCfg == nil && len(r.LatexExprs) > 0 {
-				latexCfg = &skills.LatexConfig{
-					Expressions: r.LatexExprs,
-					DarkMode:    true,
-					FontSize:    1.2,
-				}
-				latexPNG, err = skills.RenderLatex(*latexCfg)
-				if err != nil {
-					fmt.Println("[latex] matrix render error:", err)
-					latexPNG = nil
-				}
-			}
-		}
-	}
-
-	if statsText != "" {
-		actionData.ResponseMsg = statsText + "\n" + actionData.ResponseMsg
-	}
-	if solverText != "" {
-		actionData.ResponseMsg = solverText + "\n" + actionData.ResponseMsg
-	}
-	if unitText != "" {
-		actionData.ResponseMsg = unitText + "\n" + actionData.ResponseMsg
-	}
-	if ntText != "" {
-		actionData.ResponseMsg = ntText + "\n" + actionData.ResponseMsg
-	}
-	if matrixText != "" {
-		actionData.ResponseMsg = matrixText + "\n" + actionData.ResponseMsg
-	}
-
-	var chartPNG []byte
-	if chartCfg != nil {
-		chartPNG, err = skills.RenderChart(*chartCfg)
-		if err != nil {
-			fmt.Println("[chart] render error:", err)
-			chartPNG = nil
-		}
-	}
-
-	var drawingPNG []byte
-	if drawingCfg != nil {
-		drawingPNG, err = skills.RenderDrawing(*drawingCfg)
-		if err != nil {
-			fmt.Println("[drawing] render error:", err)
-			drawingPNG = nil
-		} else {
-			lastDrawingMu.Lock()
-			lastDrawing[m.ChannelID] = drawingCfg
-			lastDrawingMu.Unlock()
-		}
-	}
-
-	var pixelArtPNG []byte
-	if pixelArtCfg != nil {
-		pixelArtPNG, err = skills.RenderPixelArt(*pixelArtCfg)
-		if err != nil {
-			fmt.Println("[pixelart] render error:", err)
-			pixelArtPNG = nil
-		}
-	}
-
-	embeds, files := buildMessage(actionData, didSearch, refs, chartPNG, chartCfg, drawingPNG, pixelArtPNG, latexPNG)
-	s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+	if _, err := s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+		Content:   content,
 		Embeds:    embeds,
 		Files:     files,
 		Reference: m.Reference(),
-	})
+		AllowedMentions: &discordgo.MessageAllowedMentions{
+			Parse: []discordgo.AllowedMentionType{
+				discordgo.AllowedMentionTypeUsers,
+				discordgo.AllowedMentionTypeRoles,
+			},
+		},
+	}); err != nil {
+		fmt.Println("[send] failed to send message:", err)
+	} else {
+		fmt.Println("[send] message sent successfully")
+	}
 
 	allTasks := actionData.Tasks
-	if len(allTasks) == 0 && actionData.Action != "" && actionData.Action != "none" && actionData.Action != "generate_chart" {
+	if len(allTasks) == 0 && actionData.Action != "" && actionData.Action != "none" && actionData.Action != "generate_chart" && actionData.Action != "canvas" {
 		allTasks = append(allTasks, actions.Action{
 			Action:            actionData.Action,
 			TargetUser:        actionData.TargetUser,
@@ -566,7 +369,7 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	for _, t := range allTasks {
 		task := t
 		task.VoiceChannelID = userVoiceChannelID
-		if task.Action == "generate_chart" {
+		if task.Action == "generate_chart" || task.Action == "canvas" {
 			continue
 		}
 		if task.Action == "dm_user" {
@@ -596,115 +399,60 @@ func OnMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			Execute:           MakeExecute(task, s, m),
 		})
 	}
-}
 
-func buildMessage(actionData actions.ActionData, didSearch bool, refs []skills.References, chartPNG []byte, chartCfg *skills.ChartConfig, drawingPNG []byte, pixelArtPNG []byte, latexPNG []byte) ([]*discordgo.MessageEmbed, []*discordgo.File) {
-	var embeds []*discordgo.MessageEmbed
-	var files []*discordgo.File
+	if r := actionData.Reminder; r != nil && r.Message != "" {
+		const minMinutes, maxMinutes = 1, 43200
+		switch {
+		case r.DelayMinutes < minMinutes:
+			s.ChannelMessageSendReply(m.ChannelID, "Reminder must be at least 1 minute from now.", m.Reference())
+		case r.DelayMinutes > maxMinutes:
+			s.ChannelMessageSendReply(m.ChannelID, "Reminder can't be more than 30 days out.", m.Reference())
+		default:
+			reminders.Add(reminders.Reminder{
+				ID:        actions.GenerateID(),
+				UserID:    m.Author.ID,
+				ChannelID: m.ChannelID,
+				Message:   r.Message,
+				FireAt:    time.Now().Add(time.Duration(r.DelayMinutes) * time.Minute),
+			})
+		}
+	}
 
-	var mainEmbed *discordgo.MessageEmbed
-	if actionData.UseEmbed || strings.ToLower(actionData.ResponseType) == "embed" {
-		if didSearch {
-			mainEmbed = SearchEmbed(actionData.EmbedDescription, actionData.EmbedTitle, actionData.EmbedThumbnailUrl, actionData.EmbedImageUrl)
-		} else {
-			mainEmbed = &discordgo.MessageEmbed{
-				Title:       actionData.EmbedTitle,
-				Description: actionData.EmbedDescription,
-				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: actionData.EmbedThumbnailUrl},
-				Image:       &discordgo.MessageEmbedImage{URL: actionData.EmbedImageUrl},
-				Color:       0xFF69B4,
+	if p := actionData.Poll; p != nil && p.Question != "" && len(p.Options) >= 2 {
+		var sb strings.Builder
+		sb.WriteString("📊 **" + p.Question + "**\n\n")
+		for i, opt := range p.Options {
+			if i >= len(reminders.PollEmojis) {
+				break
+			}
+			sb.WriteString(reminders.PollEmojis[i] + " " + opt + "\n")
+		}
+		if p.DurationMinutes > 0 {
+			sb.WriteString(fmt.Sprintf("\n*Poll closes in %d minute", p.DurationMinutes))
+			if p.DurationMinutes != 1 {
+				sb.WriteString("s")
+			}
+			sb.WriteString("*")
+		}
+		pollMsg, err := s.ChannelMessageSendReply(m.ChannelID, sb.String(), m.Reference())
+		if err == nil {
+			for i := range p.Options {
+				if i >= len(reminders.PollEmojis) {
+					break
+				}
+				s.MessageReactionAdd(m.ChannelID, pollMsg.ID, reminders.PollEmojis[i])
+			}
+			if p.DurationMinutes > 0 && p.DurationMinutes <= 10080 {
+				reminders.AddPoll(reminders.TimedPoll{
+					ID:        actions.GenerateID(),
+					MessageID: pollMsg.ID,
+					ChannelID: m.ChannelID,
+					Question:  p.Question,
+					Options:   p.Options,
+					CloseAt:   time.Now().Add(time.Duration(p.DurationMinutes) * time.Minute),
+				})
 			}
 		}
-	} else {
-		mainEmbed = &discordgo.MessageEmbed{
-			Description: actionData.ResponseMsg,
-			Color:       0xFF69B4,
-		}
-	}
-
-	if chartPNG != nil {
-		title := "chart"
-		if chartCfg != nil && chartCfg.Title != "" {
-			title = strings.ReplaceAll(chartCfg.Title, " ", "_")
-		}
-		filename := title + ".png"
-		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://" + filename}
-		files = append(files, &discordgo.File{
-			Name:   filename,
-			Reader: bytes.NewReader(chartPNG),
-		})
-	}
-
-	if drawingPNG != nil {
-		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://drawing.png"}
-		files = append(files, &discordgo.File{
-			Name:   "drawing.png",
-			Reader: bytes.NewReader(drawingPNG),
-		})
-	}
-
-	if pixelArtPNG != nil {
-		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://pixel_art.png"}
-		files = append(files, &discordgo.File{
-			Name:   "pixel_art.png",
-			Reader: bytes.NewReader(pixelArtPNG),
-		})
-	}
-
-	if latexPNG != nil {
-		mainEmbed.Image = &discordgo.MessageEmbedImage{URL: "attachment://latex.png"}
-		files = append(files, &discordgo.File{
-			Name:   "latex.png",
-			Reader: bytes.NewReader(latexPNG),
-		})
-	}
-
-	embeds = append(embeds, mainEmbed)
-
-	if len(refs) > 0 {
-		embeds = append(embeds, SearchReferencesEmbed(refs))
-	}
-
-	return embeds, files
-}
-
-func buildMemoryEmbeds(mem actions.Memory) []*discordgo.MessageEmbed {
-	format := func(items []actions.MemoryItem) string {
-		if len(items) == 0 {
-			return "none"
-		}
-		var sb strings.Builder
-		for _, m := range items {
-			sb.WriteString(fmt.Sprintf("`%s` **%s** (%.2f)\n%s\n\n", m.Id, m.Title, m.Importance, m.Content))
-		}
-		return sb.String()
-	}
-
-	long := format(mem.LongTerm)
-	short := format(mem.ShortTerm)
-
-	if len(long) > 4000 {
-		long = long[:4000] + "…"
-	}
-	if len(short) > 4000 {
-		short = short[:4000] + "…"
-	}
-
-	return []*discordgo.MessageEmbed{
-		{
-			Title:       fmt.Sprintf("Memory — %d total", mem.Meta.Totalmemories),
-			Description: "**Long-term**\n" + long,
-			Color:       0xFF69B4,
-		},
-		{
-			Description: "**Short-term**\n" + short,
-			Color:       0xFF69B4,
-		},
 	}
 }
 
-func MakeExecute(task actions.Action, s *discordgo.Session, m *discordgo.MessageCreate) func() error {
-	return func() error {
-		return actions.HandleActions(task, s, m)
-	}
-}

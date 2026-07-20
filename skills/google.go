@@ -8,16 +8,16 @@ import (
 )
 
 type Google struct {
-	APIKey     string
-	CXEngineID string
-	Limit      int
+	APIKey		string
+	CXEngineID	string
+	Limit		int
 }
 
 func GoogelClient(g Google) *Google {
 	return &Google{
-		APIKey:     g.APIKey,
-		CXEngineID: g.CXEngineID,
-		Limit:      g.Limit,
+		APIKey:		g.APIKey,
+		CXEngineID:	g.CXEngineID,
+		Limit:		g.Limit,
 	}
 }
 
@@ -44,10 +44,10 @@ func (g *Google) LimitItems(items []*customsearch.Result) []*customsearch.Result
 }
 
 type References struct {
-	Title   string
-	Index   int
-	Url     string
-	Snippet string
+	Title	string
+	Index	int
+	Url	string
+	Snippet	string
 }
 
 func (g *Google) GetReferences(items []*customsearch.Result) []References {

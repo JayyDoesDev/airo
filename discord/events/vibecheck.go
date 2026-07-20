@@ -12,13 +12,13 @@ import (
 const vibeCheckTrigger = "VIBE_CHECK"
 
 type VibeCheckOpts struct {
-	Response   string
-	Client     lib.LibClient
-	FullPrompt string
-	Memory     actions.Memory
-	Session    *discordgo.Session
-	Message    *discordgo.MessageCreate
-	Guild      *discordgo.Guild
+	Response	string
+	Client		lib.LibClient
+	FullPrompt	string
+	Memory		actions.Memory
+	Session		*discordgo.Session
+	Message		*discordgo.MessageCreate
+	Guild		*discordgo.Guild
 }
 
 func HandleVibeCheck(opts VibeCheckOpts) (string, bool) {

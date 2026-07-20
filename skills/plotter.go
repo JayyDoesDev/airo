@@ -7,16 +7,28 @@ import (
 )
 
 type PlotConfig struct {
-	Expressions []BenchmarkExpr `json:"expressions"`
-	Variable    string          `json:"variable"`
-	RangeStart  float64         `json:"range_start"`
-	RangeEnd    float64         `json:"range_end"`
-	Steps       int             `json:"steps"`
-	Title       string          `json:"title,omitempty"`
-	Theme       string          `json:"theme,omitempty"`
+	Expressions	[]BenchmarkExpr	`json:"expressions"`
+	Expression	string		`json:"expression,omitempty"`
+	Variable	string		`json:"variable"`
+	RangeStart	float64		`json:"range_start"`
+	RangeEnd	float64		`json:"range_end"`
+	Start		float64		`json:"start,omitempty"`
+	End		float64		`json:"end,omitempty"`
+	Steps		int		`json:"steps"`
+	Title		string		`json:"title,omitempty"`
+	Theme		string		`json:"theme,omitempty"`
 }
 
 func PlotToChart(cfg PlotConfig) (ChartConfig, error) {
+	if len(cfg.Expressions) == 0 && cfg.Expression != "" {
+		cfg.Expressions = []BenchmarkExpr{{Label: cfg.Title, Expr: cfg.Expression}}
+	}
+	if cfg.RangeStart == 0 && cfg.Start != 0 {
+		cfg.RangeStart = cfg.Start
+	}
+	if cfg.RangeEnd == 0 && cfg.End != 0 {
+		cfg.RangeEnd = cfg.End
+	}
 	if len(cfg.Expressions) == 0 {
 		return ChartConfig{}, fmt.Errorf("no expressions provided")
 	}
@@ -63,8 +75,8 @@ func PlotToChart(cfg PlotConfig) (ChartConfig, error) {
 			values[i] = toFloat(result)
 		}
 		datasets = append(datasets, ChartDataset{
-			Name:   expr.Label,
-			Values: values,
+			Name:	expr.Label,
+			Values:	values,
 		})
 	}
 
@@ -78,12 +90,12 @@ func PlotToChart(cfg PlotConfig) (ChartConfig, error) {
 	}
 
 	return ChartConfig{
-		Type:     "line",
-		Title:    title,
-		XLabels:  xLabels,
-		Datasets: datasets,
-		Width:    1400,
-		Height:   700,
-		Theme:    theme,
+		Type:		"line",
+		Title:		title,
+		XLabels:	xLabels,
+		Datasets:	datasets,
+		Width:		1400,
+		Height:		700,
+		Theme:		theme,
 	}, nil
 }

@@ -11,17 +11,25 @@ import (
 )
 
 type LatexConfig struct {
-	Expressions []LatexExpr `json:"expressions"`
-	DarkMode    bool        `json:"dark_mode"`
-	FontSize    float64     `json:"font_size,omitempty"`
+	Expressions	[]LatexExpr	`json:"expressions"`
+	Expression	string		`json:"expression,omitempty"`
+	DarkMode	bool		`json:"dark_mode"`
+	Dark		bool		`json:"dark,omitempty"`
+	FontSize	float64		`json:"font_size,omitempty"`
 }
 
 type LatexExpr struct {
-	Label string `json:"label,omitempty"`
-	Expr  string `json:"expr"`
+	Label	string	`json:"label,omitempty"`
+	Expr	string	`json:"expr"`
 }
 
 func RenderLatex(cfg LatexConfig) ([]byte, error) {
+	if cfg.Dark {
+		cfg.DarkMode = true
+	}
+	if len(cfg.Expressions) == 0 && cfg.Expression != "" {
+		cfg.Expressions = []LatexExpr{{Expr: cfg.Expression}}
+	}
 	if len(cfg.Expressions) == 0 {
 		return nil, fmt.Errorf("no expressions provided")
 	}
@@ -42,14 +50,14 @@ func RenderLatex(cfg LatexConfig) ([]byte, error) {
 	labelGap := 4.0 * scale
 
 	type row struct {
-		label     string
-		labelPath *canvas.Path
-		exprPath  *canvas.Path
-		labelW    float64
-		labelH    float64
-		exprW     float64
-		exprH     float64
-		rowH      float64
+		label		string
+		labelPath	*canvas.Path
+		exprPath	*canvas.Path
+		labelW		float64
+		labelH		float64
+		exprW		float64
+		exprH		float64
+		rowH		float64
 	}
 
 	var rows []row

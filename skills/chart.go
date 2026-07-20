@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -17,18 +18,68 @@ type ChartDataset struct {
 }
 
 type ChartConfig struct {
-	Type     string         `json:"type"`
-	Title    string         `json:"title,omitempty"`
-	XLabels  []string       `json:"x_labels,omitempty"`
-	Datasets []ChartDataset `json:"datasets"`
-	Width    int            `json:"width,omitempty"`
-	Height   int            `json:"height,omitempty"`
-	Theme    string         `json:"theme,omitempty"`
+	Type     string          `json:"type"`
+	Title    string          `json:"title,omitempty"`
+	XLabels  []string        `json:"x_labels,omitempty"`
+	Labels   []string        `json:"labels,omitempty"`
+	Datasets []ChartDataset  `json:"datasets"`
+	Data     json.RawMessage `json:"data,omitempty"`
+	Values   []float64       `json:"values,omitempty"`
+	Colors   []string        `json:"colors,omitempty"`
+	Width    int             `json:"width,omitempty"`
+	Height   int             `json:"height,omitempty"`
+	Theme    string          `json:"theme,omitempty"`
 }
 
 var customThemeCounter atomic.Uint64
 
 func RenderChart(cfg ChartConfig) ([]byte, error) {
+	if len(cfg.XLabels) == 0 && len(cfg.Labels) > 0 {
+		cfg.XLabels = cfg.Labels
+	}
+
+	if len(cfg.Datasets) == 0 && len(cfg.Values) > 0 {
+		if len(cfg.Colors) >= len(cfg.Values) {
+
+			for i, v := range cfg.Values {
+				label := fmt.Sprintf("Item %d", i+1)
+				if i < len(cfg.XLabels) {
+					label = cfg.XLabels[i]
+				}
+				cfg.Datasets = append(cfg.Datasets, ChartDataset{Name: label, Values: []float64{v}, Color: cfg.Colors[i]})
+			}
+			cfg.XLabels = nil
+		} else {
+			cfg.Datasets = []ChartDataset{{Name: cfg.Title, Values: cfg.Values}}
+		}
+	}
+	if len(cfg.Data) > 0 {
+		var flatVals []float64
+		if err := json.Unmarshal(cfg.Data, &flatVals); err == nil {
+			if len(cfg.Datasets) == 0 && len(flatVals) > 0 {
+				cfg.Datasets = []ChartDataset{{Name: cfg.Title, Values: flatVals}}
+			}
+		} else {
+			var cjs struct {
+				Labels   []string `json:"labels"`
+				Datasets []struct {
+					Label string    `json:"label"`
+					Data  []float64 `json:"data"`
+					Color string    `json:"color"`
+				} `json:"datasets"`
+			}
+			if err := json.Unmarshal(cfg.Data, &cjs); err == nil {
+				if len(cfg.XLabels) == 0 {
+					cfg.XLabels = cjs.Labels
+				}
+				if len(cfg.Datasets) == 0 {
+					for _, ds := range cjs.Datasets {
+						cfg.Datasets = append(cfg.Datasets, ChartDataset{Name: ds.Label, Values: ds.Data, Color: ds.Color})
+					}
+				}
+			}
+		}
+	}
 	maxVals := 0
 	for _, ds := range cfg.Datasets {
 		if len(ds.Values) > maxVals {

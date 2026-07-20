@@ -11,61 +11,61 @@ import (
 const exaApi = "https://api.exa.ai/search"
 
 type Exa struct {
-	API_KEY string
-	Limit   int
+	API_KEY	string
+	Limit	int
 }
 
 type Results struct {
-	Results            []ResultBody `json:"results"`
-	Output             *Output      `json:"output"`
-	RequestId          string       `json:"requestid"`
-	ResolvedSearchType string       `json:"resolvedSearchType"`
-	Context            string       `json:"context"`
-	CostDollars        CostDollars  `json:"costDollars"`
+	Results			[]ResultBody	`json:"results"`
+	Output			*Output		`json:"output"`
+	RequestId		string		`json:"requestid"`
+	ResolvedSearchType	string		`json:"resolvedSearchType"`
+	Context			string		`json:"context"`
+	CostDollars		CostDollars	`json:"costDollars"`
 }
 
 type ResultBody struct {
-	Title           string    `json:"title"`
-	URL             string    `json:"url"`
-	PublishedAt     string    `json:"publishedDate"`
-	Author          string    `json:"author"`
-	ID              string    `json:"id"`
-	Image           string    `json:"image"`
-	Favicon         string    `json:"favicon"`
-	Text            string    `json:"text"`
-	Highlights      []string  `json:"highlights"`
-	HighlightScores []float64 `json:"highlightScores"`
-	Summary         string    `json:"summary"`
-	Subpages        []Subpage `json:"subpages"`
-	Entities        []Entity  `json:"entities"`
-	Extras          Extras    `json:"extras"`
+	Title		string		`json:"title"`
+	URL		string		`json:"url"`
+	PublishedAt	string		`json:"publishedDate"`
+	Author		string		`json:"author"`
+	ID		string		`json:"id"`
+	Image		string		`json:"image"`
+	Favicon		string		`json:"favicon"`
+	Text		string		`json:"text"`
+	Highlights	[]string	`json:"highlights"`
+	HighlightScores	[]float64	`json:"highlightScores"`
+	Summary		string		`json:"summary"`
+	Subpages	[]Subpage	`json:"subpages"`
+	Entities	[]Entity	`json:"entities"`
+	Extras		Extras		`json:"extras"`
 }
 
 type Subpage struct {
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	PublishedAt string `json:"publishedDate"`
-	Author      string `json:"author"`
-	ID          string `json:"id"`
-	Image       string `json:"image"`
-	Favicon     string `json:"favicon"`
+	Title		string	`json:"title"`
+	URL		string	`json:"url"`
+	PublishedAt	string	`json:"publishedDate"`
+	Author		string	`json:"author"`
+	ID		string	`json:"id"`
+	Image		string	`json:"image"`
+	Favicon		string	`json:"favicon"`
 }
 
 type Entity struct {
-	ID         string           `json:"id"`
-	Type       string           `json:"type"`
-	Version    int              `json:"version"`
-	Properties EntityProperties `json:"properties"`
+	ID		string			`json:"id"`
+	Type		string			`json:"type"`
+	Version		int			`json:"version"`
+	Properties	EntityProperties	`json:"properties"`
 }
 
 type EntityProperties struct {
-	Name         string       `json:"name"`
-	FoundedYear  int          `json:"foundedYear"`
-	Description  string       `json:"description"`
-	Workforce    Workforce    `json:"workforce"`
-	Headquarters Headquarters `json:"headquarters"`
-	Financials   Financials   `json:"financials"`
-	WebTraffic   WebTraffic   `json:"webTraffic"`
+	Name		string		`json:"name"`
+	FoundedYear	int		`json:"foundedYear"`
+	Description	string		`json:"description"`
+	Workforce	Workforce	`json:"workforce"`
+	Headquarters	Headquarters	`json:"headquarters"`
+	Financials	Financials	`json:"financials"`
+	WebTraffic	WebTraffic	`json:"webTraffic"`
 }
 
 type Workforce struct {
@@ -73,35 +73,35 @@ type Workforce struct {
 }
 
 type Headquarters struct {
-	Address    string `json:"address"`
-	City       string `json:"city"`
-	PostalCode string `json:"postalCode"`
-	Country    string `json:"country"`
+	Address		string	`json:"address"`
+	City		string	`json:"city"`
+	PostalCode	string	`json:"postalCode"`
+	Country		string	`json:"country"`
 }
 
 type Financials struct {
-	RevenueAnnual      float64      `json:"revenueAnnual"`
-	FundingTotal       float64      `json:"fundingTotal"`
-	FundingLatestRound FundingRound `json:"fundingLatestRound"`
+	RevenueAnnual		float64		`json:"revenueAnnual"`
+	FundingTotal		float64		`json:"fundingTotal"`
+	FundingLatestRound	FundingRound	`json:"fundingLatestRound"`
 }
 
 type FundingRound struct {
-	Name   string  `json:"name"`
-	Date   string  `json:"date"`
-	Amount float64 `json:"amount"`
+	Name	string	`json:"name"`
+	Date	string	`json:"date"`
+	Amount	float64	`json:"amount"`
 }
 
 type WebTraffic struct {
-	VisitsMonthly      int              `json:"visitsMonthly"`
-	CountryRank        int              `json:"countryRank"`
-	AvgDurationSeconds int              `json:"avgDurationSeconds"`
-	History            []TrafficHistory `json:"history"`
+	VisitsMonthly		int			`json:"visitsMonthly"`
+	CountryRank		int			`json:"countryRank"`
+	AvgDurationSeconds	int			`json:"avgDurationSeconds"`
+	History			[]TrafficHistory	`json:"history"`
 }
 
 type TrafficHistory struct {
-	Value    int    `json:"value"`
-	DateFrom string `json:"dateFrom"`
-	DateTo   string `json:"dateTo"`
+	Value		int	`json:"value"`
+	DateFrom	string	`json:"dateFrom"`
+	DateTo		string	`json:"dateTo"`
 }
 
 type Extras struct {
@@ -109,37 +109,37 @@ type Extras struct {
 }
 
 type Output struct {
-	Content   string      `json:"content"`
-	Grounding []Grounding `json:"grounding"`
+	Content		string		`json:"content"`
+	Grounding	[]Grounding	`json:"grounding"`
 }
 
 type Grounding struct {
-	Field     string     `json:"field"`
-	Citations []Citation `json:"citations"`
+	Field		string		`json:"field"`
+	Citations	[]Citation	`json:"citations"`
 }
 
 type Citation struct {
-	URL   string `json:"url"`
-	Title string `json:"title"`
+	URL	string	`json:"url"`
+	Title	string	`json:"title"`
 }
 
 type CostDollars struct {
-	Total  float64 `json:"total"`
-	Search struct {
+	Total	float64	`json:"total"`
+	Search	struct {
 		Neural float64 `json:"neural"`
-	} `json:"search"`
+	}	`json:"search"`
 }
 
 type ExaQuery struct {
-	Query    string `json:"query"`
-	Contents struct {
+	Query		string	`json:"query"`
+	Contents	struct {
 		Highlights bool `json:"highlights"`
-	} `json:"contents"`
+	}	`json:"contents"`
 }
 
 func (exa *Exa) Query(q string) (*Results, error) {
 	query := ExaQuery{
-		Query: q,
+		Query:	q,
 		Contents: struct {
 			Highlights bool `json:"highlights"`
 		}{
@@ -197,10 +197,10 @@ func (exa *Exa) GetReferences(items []ResultBody) []References {
 			snippet = snippet[:150] + "…"
 		}
 		refs = append(refs, References{
-			Title:   StripMarkdown(item.Title),
-			Index:   i + 1,
-			Url:     item.URL,
-			Snippet: snippet,
+			Title:		StripMarkdown(item.Title),
+			Index:		i + 1,
+			Url:		item.URL,
+			Snippet:	snippet,
 		})
 	}
 	return refs
