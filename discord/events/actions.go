@@ -289,7 +289,6 @@ func executeRenders(actionData actions.ActionData, channelID string) RenderResul
 	var res RenderResult
 	var mu sync.Mutex
 
-	// --- resolve configs sequentially (fast math/lookups) ---
 
 	chartCfg := actionData.Chart
 	if chartCfg == nil {
@@ -475,7 +474,6 @@ func executeRenders(actionData actions.ActionData, channelID string) RenderResul
 		}
 	}
 
-	// --- parallel renders ---
 	var wg sync.WaitGroup
 
 	if chartCfg != nil {

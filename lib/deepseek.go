@@ -32,7 +32,6 @@ func (ds *DeepSeek) SetToken(token string) {
 	ds.Client = *deepseek.NewClient(token)
 }
 
-// AcademicMode switches the bot persona to Asakawa when true.
 var AcademicMode bool
 
 func buildSystemPrompt(_ string) string {
